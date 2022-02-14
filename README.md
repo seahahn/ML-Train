@@ -1,11 +1,21 @@
-# AI-Play Template
+# AI-Play ML-Train
+**(추가되는 내용에 맞춰 지속 수정 필요)**
 
-AI Play 프로젝트 진행 중 새롭게 Repo 생성할 경우 사용할 템플릿입니다.
+머신 러닝 관련 기능 중 모델 학습 기능을 위한 API 서버
 
-Repo 만드실 때 이걸로 템플릿 선택해서 만드세요!
+## Stack
 
-이슈 양식 및 라벨 포함되어 있습니다.
+Python 3.8.12
+[FastAPI 0.73.0](fastapi.tiangolo.com)
 
-※ 주의사항
-본 템플릿 사용 시 Repo를 Private로 설정할 경우, 이슈 템플릿 사용이 불가능합니다.
-(Private Repo에서는 YAML 형식으로 작성된 이슈 템플릿이 적용되지 않음)
+## 준비 사항
+
+```
+pip install fastapi uvicorn[standard]
+```
+
+## 실행
+
+```
+uvicorn main:app --reload
+```
