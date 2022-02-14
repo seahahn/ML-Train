@@ -5,7 +5,7 @@
 
 ## Stack
 
-Python 3.8.12
+Python 3.8.12  
 [FastAPI 0.73.0](fastapi.tiangolo.com)
 
 ## 준비 사항
