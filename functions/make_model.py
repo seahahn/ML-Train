@@ -12,7 +12,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from category_encoders import OneHotEncoder, OrdinalEncoder, TargetEncoder
 from sklearn.linear_model import (
-    # LinearRegression, 
+    LinearRegression, 
     LogisticRegression,
     # RidgeClassifier,
     # Ridge,
@@ -22,10 +22,6 @@ from sklearn.linear_model import (
 # from sklearn.ensemble import (
 #     RandomForestClassifier, 
 #     RandomForestRegressor,
-#     AdaBoostClassifier,
-#     AdaBoostRegressor,
-#     GradientBoostingClassifier,
-#     GradientBoostingRegressor,
 # )
 
 
@@ -42,7 +38,7 @@ scalers = {
 }
 
 models = {
-    # "linear_regression"  : LinearRegression,
+    "linear_regression"  : LinearRegression,
     "logistic_regression": LogisticRegression,
 
 }
@@ -81,7 +77,31 @@ async def make_encoder(
     key    : str, # 키를 생성해서 리턴해야 하는지 생각중입니다!
     encoder: str,
 ) -> str:
+    """
+    ```
+    아래의 인코더 중 하나를 선택해서 객체를 생성함.
+    OneHotEncoder, OrdinalEncoder, TargetEncoder
 
+    encoder 명은 반드시 아래 리스트에 포함되어 있어야 함.
+    ["onehot_encoder", "ordinal_encoder", "target_encoder"]
+
+    해당 인코더의 파라미터를 item에 dictionary(JSON) 형태로 보내야 함.
+
+    생성된 모델은 S3 bucket의 key 경로에 name을 가진 파일로 저장됨.(pickle)
+    ```
+    Args:
+    ```
+    item   (Request, required): JSON, 파라미터
+    name   (str    , required): 생성한 인코더를 저장할 파일명
+    bucket (str    , required): 버켓을 함수에 내장해야 하는지, 쿼리로 날려야 하는지 논의 필요!
+    key    (str    , required): 키를 생성해서 리턴해야 하는 지 논의 필요!
+    encoder(str    , required): 인코더 1개(해당 함수는 하나의 모델만 생성)
+    ```
+    Returns:
+    ```
+    str: 생성 완료 메시지 +  (opt.저장된 위치 key를 해시로 내부에서 생성해서 리턴?))
+    ```
+    """
     params = json.loads(await item.json())
 
     if encoder not in encoders:
@@ -110,7 +130,31 @@ async def make_scaler(
     key   : str, # 키를 생성해서 리턴해야 하는지 생각중입니다!
     scaler: str,
 ) -> str:
+    """
+    ```
+    아래의 스케일러 중 하나를 선택해서 객체를 생성함.
+    StandardScaler, MinMaxScaler
 
+    scaler 명은 반드시 아래 리스트에 포함되어 있어야 함.
+    ["standard_scaler", "minmax_scaler"]
+
+    해당 스케일러의 파라미터를 item에 dictionary(JSON) 형태로 보내야 함.
+
+    생성된 모델은 S3 bucket의 key 경로에 name을 가진 파일로 저장됨.(pickle)
+    ```
+    Args:
+    ```
+    item  (Request, required): JSON, 파라미터
+    name  (str    , required): 생성한 스케일러를 저장할 파일명
+    bucket(str    , required): 버켓을 함수에 내장해야 하는지, 쿼리로 날려야 하는지 논의 필요!
+    key   (str    , required): 키를 생성해서 리턴해야 하는 지 논의 필요!
+    scaler(str    , required): 스케일러 1개
+    ```
+    Returns:
+    ```
+    str: 생성 완료 메시지 +  (opt.저장된 위치 key를 해시로 내부에서 생성해서 리턴?))
+    ```
+    """
     params = json.loads(await item.json())
 
     if scaler not in scalers:
@@ -138,7 +182,31 @@ async def make_model(
     key   : str, # 키를 생성해서 리턴해야 하는지 생각중입니다!
     model : str,
 ) -> str:
+    """
+    ```
+    아래 모델 중 하나를 선택해서 객체를 생성함.
+    LinearRegression, LogisticRegression
 
+    model 명은 반드시 아래 리스트에 포함되어 있어야 함.
+    ["linear_regression", "logistic_regression"]
+
+    해당 모델의 파라미터를 item에 dictionary(JSON) 형태로 보내야 함.
+
+    생성된 모델은 S3 bucket의 key 경로에 name을 가진 파일로 저장됨.(pickle)
+    ```
+    Args:
+    ```
+    item  (Request, required): JSON, 파라미터
+    name  (str    , required): 생성한 모델를 저장할 파일명
+    bucket(str    , required): 버켓을 함수에 내장해야 하는지, 쿼리로 날려야 하는지 논의 필요!
+    key   (str    , required): 키를 생성해서 리턴해야 하는 지 논의 필요!
+    model (str    , required): 모델 1개
+    ```
+    Returns:
+    ```
+    str: 생성 완료 메시지 +  (opt.저장된 위치 key를 해시로 내부에서 생성해서 리턴?))
+    ```
+    """
     params = json.loads(await item.json())
     
     if model not in models:
@@ -171,6 +239,56 @@ async def make_pipeline(
     memory : Optional[str] = Query(None,    max_length=50),
     verbose: Optional[str] = Query("false", max_length=50),
 ) -> str:
+    """
+    ```
+    
+    아래의 인코더 리스트 중 여러개를 선택함(쉼표로 구분된 어레이)
+    ["onehot_encoder", "ordinal_encoder", "target_encoder"]
+
+    아래의 스케일러 중 하나를 선택함
+    ["standard_scaler", "minmax_scaler"]
+
+    아래 모델 중 하나를 선택함
+    ["linear_regression", "logistic_regression"]
+
+    해당 모델의 파라미터를 item에 dictionary(JSON) 형태로 보내야 함.
+    params = {
+        "encoders":{
+            encoder1:{
+                ...
+            }, 
+            encoder2:{
+                ...
+            }
+        },
+        "scaler":{
+            ...
+        },
+        "model":{
+            ...
+        },
+    }
+    선택된 인코더, 스케일러, 모델로 파이프를 생성,
+    생성된 pipe는 S3 bucket의 key 경로에 name을 가진 파일로 저장됨.(pickle)
+    ```
+    Args:
+    ```
+    item   (Request, required): JSON, 파라미터
+    name   (str,     required): 생성한 모델를 저장할 파일명
+    bucket (str,     required): 버켓을 함수에 내장해야 하는지, 쿼리로 날려야 하는지 논의 필요!
+    key    (str,     required): 키를 생성해서 리턴해야 하는 지 논의 필요!
+    *
+    encoder(str,     optional): Defaults = None,    쉼표로 구분된 인코더 이름 어레이
+    scaler (str,     optional): Defaults = None,    스케일러 이름(1개)
+    model  (str    , optional): Defaults = None,    모델 이름(1개)
+    memory (str,     optional): Defaults = None,    ??? 사용할 일 없어 보임.
+    verbose(str    , optional): Defaults = "false", true, false 이 방식으로는 당장은 의미가 없어 보임.
+    ```
+    Returns:
+    ```
+    str: 생성 완료 메시지 +  (opt.저장된 위치 key를 해시로 내부에서 생성해서 리턴?))
+    ```
+    """
     encoder = None    if encoder == "" else encoder
     scaler  = None    if scaler  == "" else scaler
     model   = None    if model   == "" else model

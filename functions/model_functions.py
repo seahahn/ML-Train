@@ -78,7 +78,23 @@ async def model_transform(
     bucket : str,
     key    : str, 
 ) -> str:
-
+    """
+    ```
+    S3의 bucket에서 key/name 을 load함.
+    불러온 객체의 메소드 transform을 사용.
+    ```
+    Args:
+    ```
+    item   (Request, required): JSON, transform할 DataFrame
+    name   (str,     required): 생성한 모델를 저장할 파일명
+    bucket (str,     required): 버켓을 함수에 내장해야 하는지, 쿼리로 날려야 하는지 논의 필요!
+    key    (str,     required): 키를 생성해서 리턴해야 하는 지 논의 필요!
+    ```
+    Returns:
+    ```
+    str: JSON. transform 결과
+    ```
+    """
     item = json.loads(await item.json())
     X_train = pd.DataFrame(item[X_train])
 
@@ -100,7 +116,32 @@ async def model_fit_transform(
     bucket : str,
     key    : str, 
 ) -> str:
+    """
+    ```
+    S3의 bucket에서 key/name 을 load함.
+    불러온 객체의 메소드 fit_transform을 사용.
+    fit한 객체를 다시 똑같은 S3 bucket의 key/name에 save함
 
+    타겟 인코더 등의 fit을 하기위해 y값도 받아야함
+    y_train을 사용하지 않을 경우 JSON에서 "y_train"을 없애거나, "y_train":None 을 입력
+    JSON 형식
+    item = {
+        "X_train": DataFrame,
+        "y_train": DataFrame or None
+    }
+    ```
+    Args:
+    ```
+    item   (Request, required): JSON, transform할 DataFrame.
+    name   (str,     required): 생성한 모델를 저장할 파일명
+    bucket (str,     required): 버켓을 함수에 내장해야 하는지, 쿼리로 날려야 하는지 논의 필요!
+    key    (str,     required): 키를 생성해서 리턴해야 하는 지 논의 필요!
+    ```
+    Returns:
+    ```
+    str: JSON. transform 결과
+    ```
+    """
     item = json.loads(await item.json())
     X_train = pd.DataFrame(item[X_train])
     if "y_train" in item:
@@ -131,7 +172,32 @@ async def model_fit(
     bucket : str,
     key    : str, 
 ) -> str:
+    """
+    ```
+    S3의 bucket에서 key/name 을 load함.
+    불러온 객체의 메소드 fit_transform을 사용.
+    fit한 객체를 다시 똑같은 S3 bucket의 key/name에 save함
 
+    타겟 인코더 등의 fit을 하기위해 y값도 받아야함
+    y_train을 사용하지 않을 경우 JSON에서 "y_train"을 없애거나, "y_train":None 을 입력
+    JSON 형식
+    item = {
+        "X_train": DataFrame,
+        "y_train": DataFrame or None
+    }
+    ```
+    Args:
+    ```
+    item   (Request, required): JSON, transform할 DataFrame.
+    name   (str,     required): 생성한 모델를 저장할 파일명
+    bucket (str,     required): 버켓을 함수에 내장해야 하는지, 쿼리로 날려야 하는지 논의 필요!
+    key    (str,     required): 키를 생성해서 리턴해야 하는 지 논의 필요!
+    ```
+    Returns:
+    ```
+    str: JSON. transform 결과
+    ```
+    """
     # 입력 X_train, y_train
     item = json.loads(await item.json())
     X_train = pd.DataFrame(item["X_train"])
