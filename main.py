@@ -15,15 +15,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 from functions import (
+    model_steps,
     model_transform,
     model_fit_transform,
     model_fit,
@@ -38,6 +31,9 @@ from functions import (
     make_model,
     make_pipeline,
 )
+
+model_steps             = app.get ("/model/steps")            (model_steps)
+
 
 model_transform         = app.post("/model/transform")        (model_transform)
 model_fit_transform     = app.post("/model/fit_transform")    (model_fit_transform)

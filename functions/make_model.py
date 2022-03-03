@@ -26,21 +26,20 @@ from sklearn.linear_model import (
 
 
 
-encoders = {
+ENCODERS = {
     "onehot_encoder" : OneHotEncoder,
     "ordinal_encoder": OrdinalEncoder,
     "target_encoder" : TargetEncoder
 }
 
-scalers = {
+SCALERS = {
     "standard_scaler": StandardScaler,
     "minmax_scaler"  : MinMaxScaler
 }
 
-models = {
+MODELS = {
     "linear_regression"  : LinearRegression,
     "logistic_regression": LogisticRegression,
-
 }
 
 
@@ -102,14 +101,14 @@ async def make_encoder(
     str: 생성 완료 메시지 +  (opt.저장된 위치 key를 해시로 내부에서 생성해서 리턴?))
     ```
     """
-    params = json.loads(await item.json())
+    params = await item.json()
     
-    if encoder not in encoders:
-        return f'"encoder" should be in {list(encoders)}. current {encoder}'
+    if encoder not in ENCODERS:
+        return f'"encoder" should be in {list(ENCODERS)}. current {encoder}'
     
     # encoders[encoder](**params["encoders"][encoder])
     # encoders[encoder](**params[encoder])
-    x = encoders[encoder](**params)
+    x = ENCODERS[encoder](**params)
 
     # # 테스트용
     # name   = "test_pipe.pickle"
@@ -155,13 +154,13 @@ async def make_scaler(
     str: 생성 완료 메시지 +  (opt.저장된 위치 key를 해시로 내부에서 생성해서 리턴?))
     ```
     """
-    params = json.loads(await item.json())
+    params = await item.json()
 
-    if scaler not in scalers:
-        return f'"scaler" should be in {list(scalers)}. current {scaler}'
+    if scaler not in SCALERS:
+        return f'"scaler" should be in {list(SCALERS)}. current {scaler}'
 
     # scalers[scaler](**params[scaler])
-    x = scalers[scaler](**params)
+    x = SCALERS[scaler](**params)
 
     # # 테스트용
     # name   = "test_pipe.pickle"
@@ -207,13 +206,13 @@ async def make_model(
     str: 생성 완료 메시지 +  (opt.저장된 위치 key를 해시로 내부에서 생성해서 리턴?))
     ```
     """
-    params = json.loads(await item.json())
+    params = await item.json()
     
-    if model not in models:
-        return f'"model" should be in {list(models)}. current {model}'
+    if model not in MODELS:
+        return f'"model" should be in {list(MODELS)}. current {model}'
     
     # models[model](**params[model])
-    x = models[model](**params)
+    x = MODELS[model](**params)
 
     # # 테스트용
     # name   = "test_pipe.pickle"
@@ -295,21 +294,21 @@ async def make_pipeline(
     memory  = None    if memory  == "" else memory
     verbose = "false" if verbose == "" else verbose
     
-    params = json.loads(await item.json())
+    params = await item.json()
 
     ## validation check
     if encoder is not None:
             try   : 
                 encoder = [i.strip() for i in encoder.split(",") if i.strip() != ""]
-                if not set(encoder) <= set(encoders):
-                    return f'"encoder" should be in {list(encoders)}. current {encoder}'
+                if not set(encoder) <= set(ENCODERS):
+                    return f'"encoder" should be in {list(ENCODERS)}. current {encoder}'
             except: return '"encoder" should be array(column names) divied by ","'
     
-    if scaler is not None and scaler not in scalers:
-        return f'"scaler" should be in {list(scalers)}. current {scaler}'
+    if scaler is not None and scaler not in SCALERS:
+        return f'"scaler" should be in {list(SCALERS)}. current {scaler}'
     
-    if model is not None and model not in models:
-        return f'"model" should be in {list(models)}. current {model}'
+    if model is not None and model not in MODELS:
+        return f'"model" should be in {list(MODELS)}. current {model}'
 
     if not (encoder or scaler or model):
         return "At least an encoder, a scaler or a model is needed."
@@ -364,15 +363,15 @@ async def make_pipeline(
     steps = []
     if encoder is not None: 
         for i in encoder:
-            try: steps.append((i, encoders[i](**params["encoders"][i]))) 
+            try: steps.append((i, ENCODERS[i](**params["encoders"][i]))) 
             except: return "올바르지 않은 인코더 이름"
     
     if scaler is not None:
-        try: steps.append((scaler, scalers[scaler](**params[scaler])))
+        try: steps.append((scaler, SCALERS[scaler](**params[scaler])))
         except: return "올바르지 않은 스케일러 이름"
     
     if model is not None:
-        try: steps.append((model, models[model](**params[model])))
+        try: steps.append((model, MODELS[model](**params[model])))
         except: return "올바르지 않은 모델 이름"
 
     pipe = Pipeline(

@@ -19,8 +19,9 @@ from sklearn.metrics import (
     mean_absolute_error,
     mean_squared_error,
 )
+from make_model import MODELS
 
-scores = {
+SCORES = {
     ## Classification
     "accuracy"         : accuracy_score,
     "f1"               : f1_score,
@@ -72,11 +73,38 @@ def s3_model_load(bucket, key):
     return pickle.load(file)
 
 
+async def model_steps(
+    name   : str,
+    bucket : str,
+    key    : str,
+) -> str:
+    """
+    ```python
+    pipe.named_steps # 를 리턴하는 함수
+    ```
+    Args:
+    ```
+    name   (str, required): 생성한 모델를 저장할 파일명
+    bucket (str, required): 버켓을 함수에 내장해야 하는지, 쿼리로 날려야 하는지 논의 필요!
+    key    (str, required): 키를 생성해서 리턴해야 하는 지 논의 필요!
+    ```
+    Returns:
+    ```
+    str: list of named steps exclude ML model
+    ```
+    """
+    key = key+"/"+name
+    pipe = s3_model_load(bucket, key)
+    return [i for i in pipe.named_steps.keys() if i not in MODELS]
+
+
 async def model_transform(
     item   : Request,
     name   : str,
     bucket : str,
-    key    : str, 
+    key    : str,
+    *,
+    target : Optional[str] = Query(None, max_length=50),
 ) -> str:
     """
     ```
@@ -89,14 +117,17 @@ async def model_transform(
     name   (str,     required): 생성한 모델를 저장할 파일명
     bucket (str,     required): 버켓을 함수에 내장해야 하는지, 쿼리로 날려야 하는지 논의 필요!
     key    (str,     required): 키를 생성해서 리턴해야 하는 지 논의 필요!
+    *
+    target (str,     optional): Default: None
     ```
     Returns:
     ```
     str: JSON. transform 결과
     ```
     """
-    item = json.loads(await item.json())
-    X_train = pd.DataFrame(item[X_train])
+    target = None if target == "" else target
+    
+    X = json.loads(await item.json())
 
     # # 테스트용
     # name   = "test_pipe.pickle"
@@ -107,7 +138,29 @@ async def model_transform(
     ## s3 에서 객체 불러오기
     key = key+"/"+name
     pipe = s3_model_load(bucket, key)
-    return pd.DataFrame(pipe.transform(X_train)).to_json(orient="records")
+    steps = pipe.named_steps
+    if target is not None:
+        if target not in set(steps):
+            return f'"target" should be in pipe: {steps}'
+
+    try:
+        for key, v in list(steps.items()):
+            if key in MODELS:
+                break
+            if type(X) == pd.DataFrame:
+                cols = X.columns
+            X = v.transform(X)
+            if key == target:
+                if type(X) == pd.DataFrame:
+                    return X.to_json(orient="records")
+                else:
+                    return pd.DataFrame(X, columns=cols).to_json(orient="records")
+        if type(X) == pd.DataFrame:
+            return X.to_json(orient="records")
+        else:
+            return pd.DataFrame(X, columns=cols).to_json(orient="records")
+    except:
+        return "훈련되지 않은 모델입니다."
 
 
 async def model_fit_transform(
@@ -142,10 +195,10 @@ async def model_fit_transform(
     str: JSON. transform 결과
     ```
     """
-    item = json.loads(await item.json())
-    X_train = pd.DataFrame(item[X_train])
+    item = await item.json()
+    X_train = pd.read_json(item[X_train])
     if "y_train" in item:
-        y_train = pd.DataFrame(item[y_train])
+        y_train = pd.read_json(item[y_train])
     else:
         y_train = None
 
@@ -199,9 +252,9 @@ async def model_fit(
     ```
     """
     # 입력 X_train, y_train
-    item = json.loads(await item.json())
-    X_train = pd.DataFrame(item["X_train"])
-    y_train = pd.DataFrame(item["y_train"])
+    item = await item.json()
+    X_train = pd.read_json(item["X_train"])
+    y_train = pd.read_json(item["y_train"])
 
     # # 임시 전처리(테스트용)
     # df = pd.read_json(await item.json())
@@ -330,7 +383,7 @@ async def model_score(
     except: params = {}
 
     # 점수 값 리턴
-    print(scores[score](y_true, y_pred, **params))
+    print(SCORES[score](y_true, y_pred, **params))
     # return scores[score](y_true, y_pred, **params)
 
 
@@ -372,7 +425,7 @@ async def model_predict_score(
     else    : y_pred = pd.DataFrame(pipe.predict(X_valid), columns=["y_pred"]).to_json(orient="records")
     
     # 점수 값 리턴
-    print(scores[score](y_valid, y_pred, **params))
+    print(SCORES[score](y_valid, y_pred, **params))
     # return scores[score](y_valid, y_pred, **params)
 
 
@@ -424,6 +477,6 @@ async def model_fit_predict_score(
     else    : y_pred = pd.DataFrame(pipe.predict(X_valid), columns=["y_pred"]).to_json(orient="records")
 
     # 점수 값 리턴
-    print(scores[score](y_train, y_pred, **params)) # train score
-    print(scores[score](y_valid, y_pred, **params)) # valid score
+    print(SCORES[score](y_train, y_pred, **params)) # train score
+    print(SCORES[score](y_valid, y_pred, **params)) # valid score
     # return str(scores[score](y_train, y_pred, **params)), str(scores[score](y_valid, y_pred, **params))
