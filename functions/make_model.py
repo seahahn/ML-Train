@@ -91,7 +91,6 @@ async def make_encoder(
     ```
     item   (Request, required): JSON, 파라미터
     name   (str    , required): 생성한 인코더를 저장할 파일명
-    bucket (str    , required): 버켓을 함수에 내장해야 하는지, 쿼리로 날려야 하는지 논의 필요!
     key    (str    , required): 키를 생성해서 리턴해야 하는 지 논의 필요!
     encoder(str    , required): 인코더 1개(해당 함수는 하나의 모델만 생성)
     ```
@@ -111,7 +110,6 @@ async def make_encoder(
 
     # # 테스트용
     # name   = "test_pipe.pickle"
-    # bucket = "aiplay-test-bucket"
     # key    = "test"
 
     # AWS S3 에 pickle 저장
@@ -124,7 +122,6 @@ async def make_encoder(
 async def make_scaler(
     item  : Request,
     name  : str, # 저장 될 이름.
-    bucket: str,
     key   : str, # 키를 생성해서 리턴해야 하는지 생각중입니다!
     scaler: str,
 ) -> str:
@@ -144,7 +141,6 @@ async def make_scaler(
     ```
     item  (Request, required): JSON, 파라미터
     name  (str    , required): 생성한 스케일러를 저장할 파일명
-    bucket(str    , required): 버켓을 함수에 내장해야 하는지, 쿼리로 날려야 하는지 논의 필요!
     key   (str    , required): 키를 생성해서 리턴해야 하는 지 논의 필요!
     scaler(str    , required): 스케일러 1개
     ```
@@ -163,7 +159,6 @@ async def make_scaler(
 
     # # 테스트용
     # name   = "test_pipe.pickle"
-    # bucket = "aiplay-test-bucket"
     # key    = "test"
 
     # AWS S3 에 pickle 저장
@@ -176,7 +171,6 @@ async def make_scaler(
 async def make_model(
     item  : Request,
     name  : str, # 저장 될 이름.
-    bucket: str,
     key   : str, # 키를 생성해서 리턴해야 하는지 생각중입니다!
     model : str,
 ) -> str:
@@ -196,7 +190,6 @@ async def make_model(
     ```
     item  (Request, required): JSON, 파라미터
     name  (str    , required): 생성한 모델를 저장할 파일명
-    bucket(str    , required): 버켓을 함수에 내장해야 하는지, 쿼리로 날려야 하는지 논의 필요!
     key   (str    , required): 키를 생성해서 리턴해야 하는 지 논의 필요!
     model (str    , required): 모델 1개
     ```
@@ -215,7 +208,6 @@ async def make_model(
 
     # # 테스트용
     # name   = "test_pipe.pickle"
-    # bucket = "aiplay-test-bucket"
     # key    = "test"
 
     # AWS S3 에 pickle 저장
@@ -272,7 +264,6 @@ async def make_pipeline(
     ```
     item   (Request, required): JSON, 파라미터
     name   (str,     required): 생성한 모델를 저장할 파일명
-    bucket (str,     required): 버켓을 함수에 내장해야 하는지, 쿼리로 날려야 하는지 논의 필요!
     key    (str,     required): 키를 생성해서 리턴해야 하는 지 논의 필요!
     *
     encoder(str,     optional): Defaults = None,    쉼표로 구분된 인코더 이름 어레이
@@ -380,7 +371,6 @@ async def make_pipeline(
 
     # # 테스트용
     # name   = "test_pipe.pickle"
-    # bucket = "aiplay-test-bucket"
     # key    = "test"
 
     # ## AWS S3 에 pickle 저장
