@@ -118,7 +118,7 @@ async def model_transform(
     bucket (str,     required): 버켓을 함수에 내장해야 하는지, 쿼리로 날려야 하는지 논의 필요!
     key    (str,     required): 키를 생성해서 리턴해야 하는 지 논의 필요!
     *
-    target (str,     optional): Default: None
+    target (str,     optional): Default: None, pipe에 있는 모델만 가능
     ```
     Returns:
     ```
@@ -248,7 +248,7 @@ async def model_fit(
     ```
     Returns:
     ```
-    str: JSON. transform 결과
+    str: 성공 메시지
     ```
     """
     # 입력 X_train, y_train
