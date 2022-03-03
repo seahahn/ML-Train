@@ -24,7 +24,7 @@ from sklearn.linear_model import (
 #     RandomForestRegressor,
 # )
 
-
+BUCKET = "aiplay-test-bucket"
 
 ENCODERS = {
     "onehot_encoder" : OneHotEncoder,
@@ -49,20 +49,20 @@ def boolean(x):
     elif x.lower() == "false": return False
 
 
-def s3_model_save(bucket, key, body):
+def s3_model_save(key, body):
     s3 = boto3.client('s3') 
     s3.put_object(
-        Bucket = bucket,
+        Bucket = BUCKET,
         Key    = key,
         Body   = pickle.dumps(body)
     )
 
 
-def s3_model_load(bucket, key):
+def s3_model_load(key):
     s3 = boto3.client('s3') 
     file = io.BytesIO(
         s3.get_object(
-            Bucket = bucket,
+            Bucket = BUCKET,
             Key    = key
         )["Body"].read()
     )
@@ -72,7 +72,6 @@ def s3_model_load(bucket, key):
 async def make_encoder(
     item   : Request,
     name   : str, # 저장 될 이름.
-    bucket : str,
     key    : str, # 키를 생성해서 리턴해야 하는지 생각중입니다!
     encoder: str,
 ) -> str:
@@ -117,7 +116,7 @@ async def make_encoder(
 
     # AWS S3 에 pickle 저장
     key = key+"/"+name
-    s3_model_save(bucket, key, x)
+    s3_model_save(key, x)
 
     return f"Generation Complete: {x}"
 
@@ -169,7 +168,7 @@ async def make_scaler(
 
     # AWS S3 에 pickle 저장
     key = key+"/"+name
-    s3_model_save(bucket, key, x)
+    s3_model_save(key, x)
 
     return f"Generation Complete: {x}"
 
@@ -221,7 +220,7 @@ async def make_model(
 
     # AWS S3 에 pickle 저장
     key = key+"/"+name
-    s3_model_save(bucket, key, x)
+    s3_model_save(key, x)
 
     return f"Generation Complete: {x}"
 
@@ -229,7 +228,6 @@ async def make_model(
 async def make_pipeline(
     item   : Request,
     name   : str, # 저장 될 이름.
-    bucket : str,
     key    : str, # 키를 생성해서 리턴해야 하는지 생각중입니다!
     *,
     encoder: Optional[str] = Query(None,    max_length=50),
@@ -387,7 +385,7 @@ async def make_pipeline(
 
     # ## AWS S3 에 pickle 저장
     key = key+"/"+name
-    s3_model_save(bucket, key, pipe)
+    s3_model_save(key, pipe)
 
     # ## 로컬에 저장(테스트용)
     # with open("test_pipe.pickle", "wb") as f:
