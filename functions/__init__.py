@@ -1,4 +1,5 @@
 from functions.model_functions import (
+    model_steps,
     model_transform,
     model_fit_transform,
     model_fit,
@@ -17,6 +18,8 @@ from functions.make_model import (
 )
 
 __all__ = [
+    "model_steps",
+    
     "model_transform",
     "model_fit_transform",
     "model_fit",

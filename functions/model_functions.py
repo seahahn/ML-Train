@@ -19,8 +19,9 @@ from sklearn.metrics import (
     mean_absolute_error,
     mean_squared_error,
 )
+from make_model import MODELS, BUCKET
 
-scores = {
+SCORES = {
     ## Classification
     "accuracy"         : accuracy_score,
     "f1"               : f1_score,
@@ -52,31 +53,55 @@ def boolean(x):
     elif x.lower() == "false": return False
 
 
-def s3_model_save(bucket, key, body):
+def s3_model_save(key, body):
     s3 = boto3.client('s3') 
     s3.put_object(
-        Bucket = bucket,
+        Bucket = BUCKET,
         Key    = key,
         Body   = pickle.dumps(body)
     )
 
 
-def s3_model_load(bucket, key):
+def s3_model_load(key):
     s3 = boto3.client('s3') 
     file = io.BytesIO(
         s3.get_object(
-            Bucket = bucket,
+            Bucket = BUCKET,
             Key    = key
         )["Body"].read()
     )
     return pickle.load(file)
 
 
+async def model_steps(
+    name   : str,
+    key    : str,
+) -> str:
+    """
+    ```python
+    pipe.named_steps # 를 리턴하는 함수
+    ```
+    Args:
+    ```
+    name   (str, required): 생성한 모델를 저장할 파일명
+    key    (str, required): 키를 생성해서 리턴해야 하는 지 논의 필요!
+    ```
+    Returns:
+    ```
+    str: list of named steps exclude ML model
+    ```
+    """
+    key = key+"/"+name
+    pipe = s3_model_load(key)
+    return [i for i in pipe.named_steps.keys() if i not in MODELS]
+
+
 async def model_transform(
     item   : Request,
     name   : str,
-    bucket : str,
-    key    : str, 
+    key    : str,
+    *,
+    target : Optional[str] = Query(None, max_length=50),
 ) -> str:
     """
     ```
@@ -87,33 +112,55 @@ async def model_transform(
     ```
     item   (Request, required): JSON, transform할 DataFrame
     name   (str,     required): 생성한 모델를 저장할 파일명
-    bucket (str,     required): 버켓을 함수에 내장해야 하는지, 쿼리로 날려야 하는지 논의 필요!
     key    (str,     required): 키를 생성해서 리턴해야 하는 지 논의 필요!
+    *
+    target (str,     optional): Default: None, pipe에 있는 모델만 가능
     ```
     Returns:
     ```
     str: JSON. transform 결과
     ```
     """
-    item = json.loads(await item.json())
-    X_train = pd.DataFrame(item[X_train])
+    target = None if target == "" else target
+    
+    X = json.loads(await item.json())
 
     # # 테스트용
     # name   = "test_pipe.pickle"
-    # bucket = "aiplay-test-bucket"
     # key    = "test"
 
 
     ## s3 에서 객체 불러오기
     key = key+"/"+name
-    pipe = s3_model_load(bucket, key)
-    return pd.DataFrame(pipe.transform(X_train)).to_json(orient="records")
+    pipe = s3_model_load(key)
+    steps = pipe.named_steps
+    if target is not None:
+        if target not in set(steps):
+            return f'"target" should be in pipe: {steps}'
+
+    try:
+        for key, v in list(steps.items()):
+            if key in MODELS:
+                break
+            if type(X) == pd.DataFrame:
+                cols = X.columns
+            X = v.transform(X)
+            if key == target:
+                if type(X) == pd.DataFrame:
+                    return X.to_json(orient="records")
+                else:
+                    return pd.DataFrame(X, columns=cols).to_json(orient="records")
+        if type(X) == pd.DataFrame:
+            return X.to_json(orient="records")
+        else:
+            return pd.DataFrame(X, columns=cols).to_json(orient="records")
+    except:
+        return "훈련되지 않은 모델입니다."
 
 
 async def model_fit_transform(
     item   : Request,
     name   : str,
-    bucket : str,
     key    : str, 
 ) -> str:
     """
@@ -134,7 +181,6 @@ async def model_fit_transform(
     ```
     item   (Request, required): JSON, transform할 DataFrame.
     name   (str,     required): 생성한 모델를 저장할 파일명
-    bucket (str,     required): 버켓을 함수에 내장해야 하는지, 쿼리로 날려야 하는지 논의 필요!
     key    (str,     required): 키를 생성해서 리턴해야 하는 지 논의 필요!
     ```
     Returns:
@@ -142,34 +188,32 @@ async def model_fit_transform(
     str: JSON. transform 결과
     ```
     """
-    item = json.loads(await item.json())
-    X_train = pd.DataFrame(item[X_train])
+    item = await item.json()
+    X_train = pd.read_json(item[X_train])
     if "y_train" in item:
-        y_train = pd.DataFrame(item[y_train])
+        y_train = pd.read_json(item[y_train])
     else:
         y_train = None
 
     # # 테스트용
     # name   = "test_pipe.pickle"
-    # bucket = "aiplay-test-bucket"
     # key    = "test"
 
 
     ## s3 에서 객체 불러오기
     key = key+"/"+name
-    pipe = s3_model_load(bucket, key)
+    pipe = s3_model_load(key)
 
     if y_train: df = pd.DataFrame(pipe.fit_transform(X_train, y_train))
     else      : df = pd.DataFrame(pipe.fit_transform(X_train))
 
-    s3_model_save(bucket, key, pipe)
+    s3_model_save(key, pipe)
     return df.to_json(orient="records")
 
 
 async def model_fit(
     item   : Request,
     name   : str,
-    bucket : str,
     key    : str, 
 ) -> str:
     """
@@ -190,18 +234,17 @@ async def model_fit(
     ```
     item   (Request, required): JSON, transform할 DataFrame.
     name   (str,     required): 생성한 모델를 저장할 파일명
-    bucket (str,     required): 버켓을 함수에 내장해야 하는지, 쿼리로 날려야 하는지 논의 필요!
     key    (str,     required): 키를 생성해서 리턴해야 하는 지 논의 필요!
     ```
     Returns:
     ```
-    str: JSON. transform 결과
+    str: 성공 메시지
     ```
     """
     # 입력 X_train, y_train
-    item = json.loads(await item.json())
-    X_train = pd.DataFrame(item["X_train"])
-    y_train = pd.DataFrame(item["y_train"])
+    item = await item.json()
+    X_train = pd.read_json(item["X_train"])
+    y_train = pd.read_json(item["y_train"])
 
     # # 임시 전처리(테스트용)
     # df = pd.read_json(await item.json())
@@ -214,13 +257,12 @@ async def model_fit(
 
     # # 테스트용
     # name   = "test_pipe.pickle"
-    # bucket = "aiplay-test-bucket"
     # key    = "test"
 
 
     ## s3 에서 객체 불러오기
     key = key+"/"+name
-    pipe = s3_model_load(bucket, key)
+    pipe = s3_model_load(key)
 
     ## 로컬에서 객체 불러오기(테스트용)
     # with open("test_pipe.pickle", "rb") as f:
@@ -230,7 +272,7 @@ async def model_fit(
     pipe.fit(X_train, y_train)
 
     # 학습된 객체 s3에 저장
-    s3_model_save(bucket, key, pipe)
+    s3_model_save(key, pipe)
 
     ## 예측 되는지 확인(테스트용)
     # return pd.DataFrame(pipe.predict(X_train), columns=["Predict"]).to_json(orient="records")
@@ -242,7 +284,6 @@ async def model_fit(
 async def model_predict(
     item   : Request,
     name   : str,
-    bucket : str,
     key    : str,
     *,
     proba  : Optional[str] = Query("false", max_length=50)
@@ -261,12 +302,11 @@ async def model_predict(
 
     # # 테스트용
     # name   = "test_pipe.pickle"
-    # bucket = "aiplay-test-bucket"
     # key    = "test"
 
     # s3에서 모델 객체 불러오기
     key = key+"/"+name
-    pipe = s3_model_load(bucket, key)
+    pipe = s3_model_load(key)
     
     # 예측 proba: True 예상 확률, False 예상 label
     if proba: return pd.DataFrame(pipe.predict_proba(X_test), columns=["y_pred_prob"]).to_json(orient="records")
@@ -276,7 +316,6 @@ async def model_predict(
 async def model_fit_predict(
     item   : Request,
     name   : str,
-    bucket : str,
     key    : str,
     *,
     save   : Optional[str] = Query("true",  max_length=50),
@@ -285,7 +324,6 @@ async def model_fit_predict(
 
     # # 테스트용 입력
     # name   = "test_pipe.pickle"
-    # bucket = "aiplay-test-bucket"
     # key    = "test"
 
     save = boolean(save)
@@ -302,13 +340,13 @@ async def model_fit_predict(
 
     # s3 에서 모델 객체 불러오기
     key = key+"/"+name
-    pipe = s3_model_load(bucket, key)
+    pipe = s3_model_load(key)
 
     # 모델 학습
     pipe.fit(X_train, y_train)
 
     # save가 true면 학습된 모델 객체 s3에 저장
-    if save: s3_model_save(bucket, key, pipe)
+    if save: s3_model_save(key, pipe)
 
     # 예측 proba: True 예상 확률, False 예상 label
     if proba: return pd.DataFrame(pipe.predict_proba(X_valid), columns=["y_pred_prob"]).to_json(orient="records")
@@ -330,15 +368,14 @@ async def model_score(
     except: params = {}
 
     # 점수 값 리턴
-    print(scores[score](y_true, y_pred, **params))
-    # return scores[score](y_true, y_pred, **params)
+    print(SCORES[score](y_true, y_pred, **params))
+    return SCORES[score](y_true, y_pred, **params)
 
 
 async def model_predict_score(
     item   : Request,
     score  : str,
     name   : str,
-    bucket : str,
     key    : str,
     *,
     proba  : Optional[str] = Query("false", max_length=50)
@@ -346,7 +383,6 @@ async def model_predict_score(
 
     # # 테스트용 입력
     # name   = "test_pipe.pickle"
-    # bucket = "aiplay-test-bucket"
     # key    = "test"
 
     proba = boolean(proba)
@@ -365,22 +401,21 @@ async def model_predict_score(
 
     # 모델 로드
     key = key+"/"+name
-    pipe = s3_model_load(bucket, key)
+    pipe = s3_model_load(key)
 
     # 예측 proba: True 예상 확률, False 예상 label
     if proba: y_pred = pd.DataFrame(pipe.predict_proba(X_valid), columns=["y_pred_prob"]).to_json(orient="records") # roc_auc
     else    : y_pred = pd.DataFrame(pipe.predict(X_valid), columns=["y_pred"]).to_json(orient="records")
     
     # 점수 값 리턴
-    print(scores[score](y_valid, y_pred, **params))
-    # return scores[score](y_valid, y_pred, **params)
+    print(SCORES[score](y_valid, y_pred, **params))
+    return SCORES[score](y_valid, y_pred, **params)
 
 
 async def model_fit_predict_score(
     item   : Request,
     score  : str,
     name   : str,
-    bucket : str,
     key    : str,
     *,
     save   : Optional[str] = Query("true", max_length=50),
@@ -389,7 +424,6 @@ async def model_fit_predict_score(
 
     # # 테스트용 입력
     # name   = "test_pipe.pickle"
-    # bucket = "aiplay-test-bucket"
     # key    = "test"
 
     save = boolean(save)
@@ -411,19 +445,19 @@ async def model_fit_predict_score(
 
     # 모델 로드
     key = key+"/"+name
-    pipe = s3_model_load(bucket, key)
+    pipe = s3_model_load(key)
 
     # 모델 학습
     pipe.fit(X_train, y_train)
 
     # 모델 세이브 if save is True 
-    if save: s3_model_save(bucket, key, pipe)
+    if save: s3_model_save(key, pipe)
 
     # 예측 proba: True 예상 확률, False 예상 label
     if proba: y_pred = pd.DataFrame(pipe.predict_proba(X_valid), columns=["y_pred_prob"]).to_json(orient="records") # for roc_auc
     else    : y_pred = pd.DataFrame(pipe.predict(X_valid), columns=["y_pred"]).to_json(orient="records")
 
     # 점수 값 리턴
-    print(scores[score](y_train, y_pred, **params)) # train score
-    print(scores[score](y_valid, y_pred, **params)) # valid score
-    # return str(scores[score](y_train, y_pred, **params)), str(scores[score](y_valid, y_pred, **params))
+    print(SCORES[score](y_train, y_pred, **params)) # train score
+    print(SCORES[score](y_valid, y_pred, **params)) # valid score
+    return str(SCORES[score](y_train, y_pred, **params)), str(SCORES[score](y_valid, y_pred, **params))

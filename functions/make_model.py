@@ -24,23 +24,22 @@ from sklearn.linear_model import (
 #     RandomForestRegressor,
 # )
 
+BUCKET = "aiplay-test-bucket"
 
-
-encoders = {
+ENCODERS = {
     "onehot_encoder" : OneHotEncoder,
     "ordinal_encoder": OrdinalEncoder,
     "target_encoder" : TargetEncoder
 }
 
-scalers = {
+SCALERS = {
     "standard_scaler": StandardScaler,
     "minmax_scaler"  : MinMaxScaler
 }
 
-models = {
+MODELS = {
     "linear_regression"  : LinearRegression,
     "logistic_regression": LogisticRegression,
-
 }
 
 
@@ -50,20 +49,20 @@ def boolean(x):
     elif x.lower() == "false": return False
 
 
-def s3_model_save(bucket, key, body):
+def s3_model_save(key, body):
     s3 = boto3.client('s3') 
     s3.put_object(
-        Bucket = bucket,
+        Bucket = BUCKET,
         Key    = key,
         Body   = pickle.dumps(body)
     )
 
 
-def s3_model_load(bucket, key):
+def s3_model_load(key):
     s3 = boto3.client('s3') 
     file = io.BytesIO(
         s3.get_object(
-            Bucket = bucket,
+            Bucket = BUCKET,
             Key    = key
         )["Body"].read()
     )
@@ -73,7 +72,6 @@ def s3_model_load(bucket, key):
 async def make_encoder(
     item   : Request,
     name   : str, # 저장 될 이름.
-    bucket : str,
     key    : str, # 키를 생성해서 리턴해야 하는지 생각중입니다!
     encoder: str,
 ) -> str:
@@ -93,7 +91,6 @@ async def make_encoder(
     ```
     item   (Request, required): JSON, 파라미터
     name   (str    , required): 생성한 인코더를 저장할 파일명
-    bucket (str    , required): 버켓을 함수에 내장해야 하는지, 쿼리로 날려야 하는지 논의 필요!
     key    (str    , required): 키를 생성해서 리턴해야 하는 지 논의 필요!
     encoder(str    , required): 인코더 1개(해당 함수는 하나의 모델만 생성)
     ```
@@ -102,23 +99,22 @@ async def make_encoder(
     str: 생성 완료 메시지 +  (opt.저장된 위치 key를 해시로 내부에서 생성해서 리턴?))
     ```
     """
-    params = json.loads(await item.json())
+    params = await item.json()
     
-    if encoder not in encoders:
-        return f'"encoder" should be in {list(encoders)}. current {encoder}'
+    if encoder not in ENCODERS:
+        return f'"encoder" should be in {list(ENCODERS)}. current {encoder}'
     
     # encoders[encoder](**params["encoders"][encoder])
     # encoders[encoder](**params[encoder])
-    x = encoders[encoder](**params)
+    x = ENCODERS[encoder](**params)
 
     # # 테스트용
     # name   = "test_pipe.pickle"
-    # bucket = "aiplay-test-bucket"
     # key    = "test"
 
     # AWS S3 에 pickle 저장
     key = key+"/"+name
-    s3_model_save(bucket, key, x)
+    s3_model_save(key, x)
 
     return f"Generation Complete: {x}"
 
@@ -126,7 +122,6 @@ async def make_encoder(
 async def make_scaler(
     item  : Request,
     name  : str, # 저장 될 이름.
-    bucket: str,
     key   : str, # 키를 생성해서 리턴해야 하는지 생각중입니다!
     scaler: str,
 ) -> str:
@@ -146,7 +141,6 @@ async def make_scaler(
     ```
     item  (Request, required): JSON, 파라미터
     name  (str    , required): 생성한 스케일러를 저장할 파일명
-    bucket(str    , required): 버켓을 함수에 내장해야 하는지, 쿼리로 날려야 하는지 논의 필요!
     key   (str    , required): 키를 생성해서 리턴해야 하는 지 논의 필요!
     scaler(str    , required): 스케일러 1개
     ```
@@ -155,22 +149,21 @@ async def make_scaler(
     str: 생성 완료 메시지 +  (opt.저장된 위치 key를 해시로 내부에서 생성해서 리턴?))
     ```
     """
-    params = json.loads(await item.json())
+    params = await item.json()
 
-    if scaler not in scalers:
-        return f'"scaler" should be in {list(scalers)}. current {scaler}'
+    if scaler not in SCALERS:
+        return f'"scaler" should be in {list(SCALERS)}. current {scaler}'
 
     # scalers[scaler](**params[scaler])
-    x = scalers[scaler](**params)
+    x = SCALERS[scaler](**params)
 
     # # 테스트용
     # name   = "test_pipe.pickle"
-    # bucket = "aiplay-test-bucket"
     # key    = "test"
 
     # AWS S3 에 pickle 저장
     key = key+"/"+name
-    s3_model_save(bucket, key, x)
+    s3_model_save(key, x)
 
     return f"Generation Complete: {x}"
 
@@ -178,7 +171,6 @@ async def make_scaler(
 async def make_model(
     item  : Request,
     name  : str, # 저장 될 이름.
-    bucket: str,
     key   : str, # 키를 생성해서 리턴해야 하는지 생각중입니다!
     model : str,
 ) -> str:
@@ -198,7 +190,6 @@ async def make_model(
     ```
     item  (Request, required): JSON, 파라미터
     name  (str    , required): 생성한 모델를 저장할 파일명
-    bucket(str    , required): 버켓을 함수에 내장해야 하는지, 쿼리로 날려야 하는지 논의 필요!
     key   (str    , required): 키를 생성해서 리턴해야 하는 지 논의 필요!
     model (str    , required): 모델 1개
     ```
@@ -207,22 +198,21 @@ async def make_model(
     str: 생성 완료 메시지 +  (opt.저장된 위치 key를 해시로 내부에서 생성해서 리턴?))
     ```
     """
-    params = json.loads(await item.json())
+    params = await item.json()
     
-    if model not in models:
-        return f'"model" should be in {list(models)}. current {model}'
+    if model not in MODELS:
+        return f'"model" should be in {list(MODELS)}. current {model}'
     
     # models[model](**params[model])
-    x = models[model](**params)
+    x = MODELS[model](**params)
 
     # # 테스트용
     # name   = "test_pipe.pickle"
-    # bucket = "aiplay-test-bucket"
     # key    = "test"
 
     # AWS S3 에 pickle 저장
     key = key+"/"+name
-    s3_model_save(bucket, key, x)
+    s3_model_save(key, x)
 
     return f"Generation Complete: {x}"
 
@@ -230,7 +220,6 @@ async def make_model(
 async def make_pipeline(
     item   : Request,
     name   : str, # 저장 될 이름.
-    bucket : str,
     key    : str, # 키를 생성해서 리턴해야 하는지 생각중입니다!
     *,
     encoder: Optional[str] = Query(None,    max_length=50),
@@ -275,7 +264,6 @@ async def make_pipeline(
     ```
     item   (Request, required): JSON, 파라미터
     name   (str,     required): 생성한 모델를 저장할 파일명
-    bucket (str,     required): 버켓을 함수에 내장해야 하는지, 쿼리로 날려야 하는지 논의 필요!
     key    (str,     required): 키를 생성해서 리턴해야 하는 지 논의 필요!
     *
     encoder(str,     optional): Defaults = None,    쉼표로 구분된 인코더 이름 어레이
@@ -295,21 +283,21 @@ async def make_pipeline(
     memory  = None    if memory  == "" else memory
     verbose = "false" if verbose == "" else verbose
     
-    params = json.loads(await item.json())
+    params = await item.json()
 
     ## validation check
     if encoder is not None:
             try   : 
                 encoder = [i.strip() for i in encoder.split(",") if i.strip() != ""]
-                if not set(encoder) <= set(encoders):
-                    return f'"encoder" should be in {list(encoders)}. current {encoder}'
+                if not set(encoder) <= set(ENCODERS):
+                    return f'"encoder" should be in {list(ENCODERS)}. current {encoder}'
             except: return '"encoder" should be array(column names) divied by ","'
     
-    if scaler is not None and scaler not in scalers:
-        return f'"scaler" should be in {list(scalers)}. current {scaler}'
+    if scaler is not None and scaler not in SCALERS:
+        return f'"scaler" should be in {list(SCALERS)}. current {scaler}'
     
-    if model is not None and model not in models:
-        return f'"model" should be in {list(models)}. current {model}'
+    if model is not None and model not in MODELS:
+        return f'"model" should be in {list(MODELS)}. current {model}'
 
     if not (encoder or scaler or model):
         return "At least an encoder, a scaler or a model is needed."
@@ -364,15 +352,15 @@ async def make_pipeline(
     steps = []
     if encoder is not None: 
         for i in encoder:
-            try: steps.append((i, encoders[i](**params["encoders"][i]))) 
+            try: steps.append((i, ENCODERS[i](**params["encoders"][i]))) 
             except: return "올바르지 않은 인코더 이름"
     
     if scaler is not None:
-        try: steps.append((scaler, scalers[scaler](**params[scaler])))
+        try: steps.append((scaler, SCALERS[scaler](**params[scaler])))
         except: return "올바르지 않은 스케일러 이름"
     
     if model is not None:
-        try: steps.append((model, models[model](**params[model])))
+        try: steps.append((model, MODELS[model](**params[model])))
         except: return "올바르지 않은 모델 이름"
 
     pipe = Pipeline(
@@ -383,12 +371,11 @@ async def make_pipeline(
 
     # # 테스트용
     # name   = "test_pipe.pickle"
-    # bucket = "aiplay-test-bucket"
     # key    = "test"
 
     # ## AWS S3 에 pickle 저장
     key = key+"/"+name
-    s3_model_save(bucket, key, pipe)
+    s3_model_save(key, pipe)
 
     # ## 로컬에 저장(테스트용)
     # with open("test_pipe.pickle", "wb") as f:
