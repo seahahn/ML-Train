@@ -1,15 +1,13 @@
 from typing import Optional
 from fastapi import Request, Query
-import json
-import pickle
-import boto3
-import io
+import json, pickle, boto3, io
 
 import pandas as pd
 # import modin.pandas as pd
 
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.impute import SimpleImputer, KNNImputer
 from category_encoders import OneHotEncoder, OrdinalEncoder, TargetEncoder
 from sklearn.linear_model import (
     LinearRegression, 
@@ -356,11 +354,11 @@ async def make_pipeline(
             except: return "올바르지 않은 인코더 이름"
     
     if scaler is not None:
-        try: steps.append((scaler, SCALERS[scaler](**params[scaler])))
+        try: steps.append((scaler, SCALERS[scaler](**params["scaler"])))
         except: return "올바르지 않은 스케일러 이름"
     
     if model is not None:
-        try: steps.append((model, MODELS[model](**params[model])))
+        try: steps.append((model, MODELS[model](**params["model"])))
         except: return "올바르지 않은 모델 이름"
 
     pipe = Pipeline(
