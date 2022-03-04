@@ -18,7 +18,7 @@ from sklearn.metrics import (
 )
 from .make_model import MODELS, BUCKET
 
-SCORES = {
+METRICS = {
     ## Classification
     "accuracy"         : accuracy_score,
     "f1"               : f1_score,
@@ -70,6 +70,7 @@ def s3_model_load(key):
     return pickle.load(file)
 
 
+## 나중에 sql로 바꿀 예정
 async def model_steps(
     name   : str,
     key    : str,
@@ -286,32 +287,31 @@ async def model_predict(
     item   : Request,
     name   : str,
     key    : str,
-    *,
-    proba  : Optional[str] = Query("false", max_length=50)
+    # *,
+    # proba  : Optional[str] = Query("false", max_length=50)
 ) -> str:
 
     # 데이터 로드
-    X_test = pd.read_json(await item.json())
+    X_test = await item.json()
 
-    proba = boolean(proba)
-    if proba is None: return '"proba" should be bool, "true" or "false"'
-
-    # 테스트용
-    # df = df.drop(["PassengerId","Name", "Ticket", "Cabin"], axis=1)
-    # X_test = df.dropna().reset_index(drop=True)
-    # print(X_test)
-
-    # # 테스트용
-    # name   = "test_pipe.pickle"
-    # key    = "test"
+    # proba = boolean(proba)
+    # if proba is None: return '"proba" should be bool, "true" or "false"'
 
     # s3에서 모델 객체 불러오기
     key = key+"/"+name
     pipe = s3_model_load(key)
-    
+
     # 예측 proba: True 예상 확률, False 예상 label
-    if proba: return pd.DataFrame(pipe.predict_proba(X_test), columns=["y_pred_prob"]).to_json(orient="records")
-    else    : return pd.DataFrame(pipe.predict(X_test), columns=["y_pred"]).to_json(orient="records")
+    ## {"y_pred":..., "y_pred_proba":...}
+    try:
+        return {
+            "y_pred"      : pd.DataFrame(pipe.predict(X_test)).to_json(orient="records"),
+            "y_pred_proba": pd.DataFrame(pipe.predict_proba(X_test)).to_json(orient="records")
+        }
+    except:
+        return {
+            "y_pred": pd.DataFrame(pipe.predict(X_test)).to_json(orient="records")
+        }
 
 
 async def model_fit_predict(
@@ -320,7 +320,6 @@ async def model_fit_predict(
     key    : str,
     *,
     save   : Optional[str] = Query("true",  max_length=50),
-    proba  : Optional[str] = Query("false", max_length=50),
 ) -> str:
 
     # # 테스트용 입력
@@ -330,14 +329,11 @@ async def model_fit_predict(
     save = boolean(save)
     if save is None: return '"save" should be bool, "true" or "false"'
 
-    proba = boolean(proba)
-    if proba is None: return '"proba" should be bool, "true" or "false"'
-
-    item = json.loads(await item.json())
-    X_train = pd.DataFrame(item["X_train"])
-    y_train = pd.DataFrame(item["y_train"])
-    X_valid = pd.DataFrame(item["X_valid"])
-    # y_valid = pd.DataFrame(item["y_valid"])
+    item = await item.json()
+    X_train = pd.read_json(item["X_train"])
+    y_train = pd.read_json(item["y_train"])
+    X_valid = pd.read_json(item["X_valid"])
+    # y_valid = pd.read_json(item["y_valid"])
 
     # s3 에서 모델 객체 불러오기
     key = key+"/"+name
@@ -350,77 +346,87 @@ async def model_fit_predict(
     if save: s3_model_save(key, pipe)
 
     # 예측 proba: True 예상 확률, False 예상 label
-    if proba: return pd.DataFrame(pipe.predict_proba(X_valid), columns=["y_pred_prob"]).to_json(orient="records")
-    else    : return pd.DataFrame(pipe.predict(X_valid), columns=["y_pred"]).to_json(orient="records")
+    ## {"y_pred":..., "y_pred_proba":...}
+    try:
+        return {
+            "y_pred"      : pd.DataFrame(pipe.predict(X_valid)).to_json(orient="records"),
+            "y_pred_proba": pd.DataFrame(pipe.predict_proba(X_valid)).to_json(orient="records")
+        }
+    except:
+        return {
+            "y_pred": pd.DataFrame(pipe.predict(X_valid)).to_json(orient="records")
+        }
 
 
 async def model_score(
-    item   : Request,
-    score  : str,
+    item  : Request,
+    metric: str,
 ) -> str:
     
     # 데이터 로드
-    ys = json.loads(await item.json())
-    y_true = pd.DataFrame(ys["y_true"])
-    y_pred = pd.DataFrame(ys["y_pred"]) # roc_auc 는 y_pred가 predict proba가 들어가야함
-
+    # {"y_ture":..., "y_pred":..., *, "y_pred_proba":...}
+    ys = await item.json()
+    y_true = pd.read_json(ys["y_true"])
+    try:
+        y_pred = pd.read_json(ys["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(ys["y_pred"]) 
+    except:
+        print(f'"{metric}"은 회귀 모델에서 사용할 수 없습니다.')
+    # roc_auc 는 y_pred가 predict proba가 들어가야함
+    
     # score 파라미터 로드
-    try: params = ys[score]
-    except: params = {}
+    # try: params = ys[score]
+    # except: params = {}
 
     # 점수 값 리턴
-    print(SCORES[score](y_true, y_pred, **params))
-    return SCORES[score](y_true, y_pred, **params)
+    print(METRICS[metric](y_true, y_pred))
+    return METRICS[metric](y_true, y_pred)
 
 
 async def model_predict_score(
     item   : Request,
-    score  : str,
+    metric : str,
     name   : str,
     key    : str,
-    *,
-    proba  : Optional[str] = Query("false", max_length=50)
 ) -> str:
 
-    # # 테스트용 입력
-    # name   = "test_pipe.pickle"
-    # key    = "test"
-
-    proba = boolean(proba)
-    if proba is None: return '"proba" should be bool, "true" or "false"'
-
     # 데이터 로드
-    item = json.loads(await item.json())
+    item = await item.json()
     # X_train = pd.DataFrame(item["X_train"])
     # y_train = pd.DataFrame(item["y_train"])
-    X_valid = pd.DataFrame(item["X_valid"])
-    y_valid = pd.DataFrame(item["y_valid"])
-
-    # score 파라미터 로드
-    try: params = item[score]
-    except: params = {}
+    X_valid = pd.read_json(item["X_valid"])
+    y_valid = pd.read_json(item["y_valid"])
 
     # 모델 로드
     key = key+"/"+name
     pipe = s3_model_load(key)
 
     # 예측 proba: True 예상 확률, False 예상 label
-    if proba: y_pred = pd.DataFrame(pipe.predict_proba(X_valid), columns=["y_pred_prob"]).to_json(orient="records") # roc_auc
-    else    : y_pred = pd.DataFrame(pipe.predict(X_valid), columns=["y_pred"]).to_json(orient="records")
+    try:
+        y_pred = {
+            "y_pred"      : pd.DataFrame(pipe.predict(X_valid)).to_json(orient="records"),
+            "y_pred_proba": pd.DataFrame(pipe.predict_proba(X_valid)).to_json(orient="records")
+        }
+    except:
+        y_pred = {
+            "y_pred": pd.DataFrame(pipe.predict(X_valid)).to_json(orient="records")
+        }
+    try:
+        y_pred = pd.read_json(y_pred["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(y_pred["y_pred"]) 
+    except:
+        print(f'"{metric}"은 회귀 모델에서 사용할 수 없습니다.')
     
     # 점수 값 리턴
-    print(SCORES[score](y_valid, y_pred, **params))
-    return SCORES[score](y_valid, y_pred, **params)
+    print(METRICS[metric](y_valid, y_pred))
+    return METRICS[metric](y_valid, y_pred)
 
 
 async def model_fit_predict_score(
     item   : Request,
-    score  : str,
+    metric : str,
     name   : str,
     key    : str,
     *,
     save   : Optional[str] = Query("true", max_length=50),
-    proba  : Optional[str] = Query("false", max_length=50),
 ) -> str:
 
     # # 테스트용 입력
@@ -430,19 +436,12 @@ async def model_fit_predict_score(
     save = boolean(save)
     if save is None: return '"save" should be bool, "true" or "false"'
 
-    proba = boolean(proba)
-    if proba is None: return '"proba" should be bool, "true" or "false"'
-
     # 데이터 로드
-    item = json.loads(await item.json())
-    X_train = pd.DataFrame(item["X_train"])
-    y_train = pd.DataFrame(item["y_train"])
-    X_valid = pd.DataFrame(item["X_valid"])
-    y_valid = pd.DataFrame(item["y_valid"])
-
-    # score 파라미터 로드
-    try: params = item[score]
-    except: params = {}
+    item = await item.json()
+    X_train = pd.read_json(item["X_train"])
+    y_train = pd.read_json(item["y_train"])
+    X_valid = pd.read_json(item["X_valid"])
+    y_valid = pd.read_json(item["y_valid"])
 
     # 모델 로드
     key = key+"/"+name
@@ -455,10 +454,34 @@ async def model_fit_predict_score(
     if save: s3_model_save(key, pipe)
 
     # 예측 proba: True 예상 확률, False 예상 label
-    if proba: y_pred = pd.DataFrame(pipe.predict_proba(X_valid), columns=["y_pred_prob"]).to_json(orient="records") # for roc_auc
-    else    : y_pred = pd.DataFrame(pipe.predict(X_valid), columns=["y_pred"]).to_json(orient="records")
+    try:
+        y_pred_train = {
+            "y_pred"      : pd.DataFrame(pipe.predict(X_train)).to_json(orient="records"),
+            "y_pred_proba": pd.DataFrame(pipe.predict_proba(X_train)).to_json(orient="records")
+        }
+    except:
+        y_pred_train = {
+            "y_pred": pd.DataFrame(pipe.predict(X_train)).to_json(orient="records")
+        }
+    try:
+        y_pred = {
+            "y_pred"      : pd.DataFrame(pipe.predict(X_valid)).to_json(orient="records"),
+            "y_pred_proba": pd.DataFrame(pipe.predict_proba(X_valid)).to_json(orient="records")
+        }
+    except:
+        y_pred = {
+            "y_pred": pd.DataFrame(pipe.predict(X_valid)).to_json(orient="records")
+        }
+    try:
+        y_pred_train = pd.read_json(y_pred_train["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(y_pred_train["y_pred"]) 
+    except:
+        print(f'"{metric}"은 회귀 모델에서 사용할 수 없습니다.')
+    try:
+        y_pred = pd.read_json(y_pred["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(y_pred["y_pred"]) 
+    except:
+        print(f'"{metric}"은 회귀 모델에서 사용할 수 없습니다.')
 
     # 점수 값 리턴
-    print(SCORES[score](y_train, y_pred, **params)) # train score
-    print(SCORES[score](y_valid, y_pred, **params)) # valid score
-    return str(SCORES[score](y_train, y_pred, **params)), str(SCORES[score](y_valid, y_pred, **params))
+    print(METRICS[metric](y_train, y_pred_train)) # train score
+    print(METRICS[metric](y_valid, y_pred)) # valid score
+    return {"Train_Score":str(METRICS[metric](y_train, y_pred_train)), "Valid Score":str(METRICS[metric](y_valid, y_pred))}
