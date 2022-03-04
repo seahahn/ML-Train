@@ -290,6 +290,22 @@ async def model_predict(
     # *,
     # proba  : Optional[str] = Query("false", max_length=50)
 ) -> str:
+    """
+    ```python
+    pipe.predict(X)
+    pipe.predict_proba(X) # if ML Model is Classification
+    ```
+    Args:
+    ```
+    item (Request, required): JSON, single dataframe
+    name (str,     required): 생성한 모델를 저장할 파일명
+    key  (str,     required): 키를 생성해서 리턴해야 하는 지 논의 필요!
+    ```
+    Returns:
+    ```
+    str: JSON, {"y_pred":..., "y_pred_proba":...}
+    ```
+    """
 
     # 데이터 로드
     X_test = await item.json()
@@ -362,7 +378,27 @@ async def model_score(
     item  : Request,
     metric: str,
 ) -> str:
-    
+    """
+    ```python
+    item = {
+        "y_ture":..., 
+        "y_pred":..., 
+        "y_pred_proba":(optional)...
+    }
+    metric에 아래 metric중 하나를 입력
+    ["accuracy", "f1", "roc_auc", "precision", "recall", "r2", "neg_mean_absolute_error", "neg_mean_squared_error"]
+    ```
+
+    Args:
+    ```
+    item  (Request, required): JSON, {"y_ture":..., "y_pred":..., "y_pred_proba":(optional)...}
+    metric(str,     required): ["accuracy", "f1", "roc_auc", "precision", "recall", "r2", "neg_mean_absolute_error", "neg_mean_squared_error"] 중 하나
+    ```
+    Returns:
+    ```
+    str: 점수
+    ```
+    """
     # 데이터 로드
     # {"y_ture":..., "y_pred":..., *, "y_pred_proba":...}
     ys = await item.json()
