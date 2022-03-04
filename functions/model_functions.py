@@ -387,8 +387,9 @@ async def model_score(
     }
     metric에 아래 metric중 하나를 입력
     ["accuracy", "f1", "roc_auc", "precision", "recall", "r2", "neg_mean_absolute_error", "neg_mean_squared_error"]
-    ```
 
+    return MATRICS[matric](y_true, y_pred)
+    ```
     Args:
     ```
     item  (Request, required): JSON, {"y_ture":..., "y_pred":..., "y_pred_proba":(optional)...}
