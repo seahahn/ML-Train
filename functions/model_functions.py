@@ -1,9 +1,6 @@
 from typing import Optional
 from fastapi import Request, Query
-import json
-import pickle
-import boto3
-import io
+import json, pickle, boto3, io
 
 import pandas as pd
 # import modin.pandas as pd
@@ -19,7 +16,7 @@ from sklearn.metrics import (
     mean_absolute_error,
     mean_squared_error,
 )
-from make_model import MODELS, BUCKET
+from .make_model import MODELS, BUCKET
 
 SCORES = {
     ## Classification
@@ -123,7 +120,7 @@ async def model_transform(
     """
     target = None if target == "" else target
     
-    X = json.loads(await item.json())
+    X = pd.read_json(await item.json())
 
     # # 테스트용
     # name   = "test_pipe.pickle"
@@ -189,9 +186,9 @@ async def model_fit_transform(
     ```
     """
     item = await item.json()
-    X_train = pd.read_json(item[X_train])
+    X_train = pd.read_json(item["X_train"])
     if "y_train" in item:
-        y_train = pd.read_json(item[y_train])
+        y_train = pd.read_json(item["y_train"])
     else:
         y_train = None
 
@@ -204,8 +201,9 @@ async def model_fit_transform(
     key = key+"/"+name
     pipe = s3_model_load(key)
 
-    if y_train: df = pd.DataFrame(pipe.fit_transform(X_train, y_train))
-    else      : df = pd.DataFrame(pipe.fit_transform(X_train))
+    cols = X_train.columns
+    if y_train: df = pd.DataFrame(pipe.fit_transform(X_train, y_train), columns=cols)
+    else      : df = pd.DataFrame(pipe.fit_transform(X_train), columns=cols)
 
     s3_model_save(key, pipe)
     return df.to_json(orient="records")
@@ -245,6 +243,9 @@ async def model_fit(
     item = await item.json()
     X_train = pd.read_json(item["X_train"])
     y_train = pd.read_json(item["y_train"])
+
+    if X_train.shape[0] != y_train.shape[0]:
+        return "X_train과 y_train의 row 길이가 같아야합니다. [shape = (row,column)]"
 
     # # 임시 전처리(테스트용)
     # df = pd.read_json(await item.json())
