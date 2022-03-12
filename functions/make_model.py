@@ -1,70 +1,27 @@
 from typing import Optional
+from category_encoders import OneHotEncoder
 from fastapi import Request, Query
-import json, pickle, boto3, io
 
-import pandas as pd
+# import json
+# import numpy as np
+from scipy.stats import randint, uniform
+# import pandas as pd
 # import modin.pandas as pd
 
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from sklearn.impute import SimpleImputer, KNNImputer
-from category_encoders import OneHotEncoder, OrdinalEncoder, TargetEncoder
-from sklearn.linear_model import (
-    LinearRegression, 
-    LogisticRegression,
-    # RidgeClassifier,
-    # Ridge,
-    # Lasso,
+
+
+from .internal_func import (
+    s3_model_save, 
+    s3_model_load, 
+    boolean,
+    isint,
+    ENCODERS,
+    SCALERS,
+    MODELS,
+    METRICS,
+    OPTIMIZERS,
 )
-# from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
-# from sklearn.ensemble import (
-#     RandomForestClassifier, 
-#     RandomForestRegressor,
-# )
-
-BUCKET = "aiplay-test-bucket"
-
-ENCODERS = {
-    "onehot_encoder" : OneHotEncoder,
-    "ordinal_encoder": OrdinalEncoder,
-    "target_encoder" : TargetEncoder
-}
-
-SCALERS = {
-    "standard_scaler": StandardScaler,
-    "minmax_scaler"  : MinMaxScaler
-}
-
-MODELS = {
-    "linear_regression"  : LinearRegression,
-    "logistic_regression": LogisticRegression,
-}
-
-
-
-def boolean(x):
-    if   x.lower() == "true" : return True
-    elif x.lower() == "false": return False
-
-
-def s3_model_save(key, body):
-    s3 = boto3.client('s3') 
-    s3.put_object(
-        Bucket = BUCKET,
-        Key    = key,
-        Body   = pickle.dumps(body)
-    )
-
-
-def s3_model_load(key):
-    s3 = boto3.client('s3') 
-    file = io.BytesIO(
-        s3.get_object(
-            Bucket = BUCKET,
-            Key    = key
-        )["Body"].read()
-    )
-    return pickle.load(file)
 
 
 async def make_encoder(
@@ -379,5 +336,133 @@ async def make_pipeline(
     # with open("test_pipe.pickle", "wb") as f:
     #     pickle.dump(pipe, f)
 
-    return f"Generated Model: {pipe}"
+    return {"result": True, "message":f"Generated Model: {pipe}"}
 
+
+# RandomizedSearchCV, GridSearchCV
+
+async def make_optimizer(
+    item              : Request,
+    name              : str, # 불러올 모델 이름.
+    key               : str, 
+    optimizer         : str,
+    *,
+    save_name         : Optional[str] = Query(None,    max_length=50), # 다른 이름으로 저장
+    n_iter            : Optional[str] = Query(10,      max_length=50),
+    scoring           : Optional[str] = Query(None,    max_length=50),
+    n_jobs            : Optional[str] = Query(None,    max_length=50), # 멀티 유저를 상정하기 때문에 1로 고정하는 것이 어떨까요?
+    cv                : Optional[str] = Query(5,       max_length=50), # None, to use the default 5-fold cross validation
+    random_state      : Optional[str] = Query(None,    max_length=50),
+    return_train_score: Optional[str] = Query("false", max_length=50),
+    # refit
+    # verbose
+    # pre_dispatch
+    # error_score
+) -> str:
+
+    if optimizer not in OPTIMIZERS:
+        return "지원되지 않는 optimizer"
+
+    save_name          = None    if save_name          == "" else save_name
+    n_iter             = 10      if n_iter             == "" else n_iter
+    scoring            = None    if scoring            == "" else scoring
+    n_jobs             = None    if n_jobs             == "" else n_jobs
+    cv                 = 5       if cv                 == "" else cv
+    random_state       = None    if random_state       == "" else random_state
+    return_train_score = "false" if return_train_score == "" else return_train_score
+    
+    # n_iter
+    if isint(n_iter): n_iter = int(n_iter)
+    else            : return "n_iter는 정수만 가능!"        
+
+    # scoring
+    if scoring is not None and scoring not in METRICS:
+        return f"scoring은 반드시 {list(METRICS)}안에 포함되어야 함!"
+
+    # n_jobs
+    if isint(n_jobs): n_jobs = int(n_jobs)
+    else            : return "n_jobs는 정수만 가능!"        
+
+    # cv
+    if isint(cv): cv = int(cv)
+    else        : return "cv는 정수만 가능!"        
+
+    # random_state
+    if random_state is not None:
+        if isint(random_state): random_state = int(random_state)
+        else                  : return "random_state는 정수만 가능!"
+
+    # return_train_score
+    return_train_score = boolean(return_train_score)
+    if return_train_score is None:
+        return "return_train_score should be true or false"
+
+    # 사용하지 않는 파라미터
+    # refit
+    # verbose
+    # pre_dispatch
+    # error_score
+    {
+        "onehot_encoder":{
+            "param1":...,
+            "param2":...
+        },
+        "standard_scaler":{
+            "param1":...,
+        }
+    }
+
+    {
+        "onehot_encoder__cat_use_named": True,
+        # "onehot_encoder__columns": [[...], [...], [...]],
+        "standard_scaler__params1": "0,1,2",
+        "encoder__max": "_randint,10,100",
+        "encoder__max": "_randexp,10,-10,-4"
+    }
+
+    params:dict = await item.json()
+
+    for i, v in params.items():
+        x = v.split(",")
+        if   x[0] == "_randint": # ex) "randint,-3,3" => [-3,-2,-1,0,1,2,3]
+            params[i] = randint(int(x[1]),int(x[2]))
+        elif x[0] == "_randexp": # ex) "randexp,10,-3,3" => [0.001, 0.01, 0.1, 1, 10, 100, 1000]
+            params[i] = int(x[1])**randint(int(x[2]),int(x[3]))
+        elif x[0] == "_uniform": # ex) "uniform,0,1" => 0.0 ~ 1.0 사이의 값을 균일 확률로...?
+            params[i] = uniform(int(x[1]),int(x[2]))
+        else:
+            # 숫자형일 경우 숫자형 리스트로 변환
+            try:
+                params[i] = [float(k) for k in x]
+            except:
+                params[i] = [k.strip() for k in x]
+
+    kwargs = {
+        "n_iter"            : n_iter,
+        "scoring"           : scoring,
+        "n_jobs"            : n_jobs,
+        "cv"                : cv,
+        "random_state"      : random_state,
+        "return_train_score": return_train_score,
+        # "refit"             : True,
+        # "verbose"           : 0,
+        # "pre_dispatch"      : "2*n_jobs",
+        # "error_score"       : np.nan,
+    }
+
+    if optimizer == "grid_search_cv":
+        del kwargs["n_iter"]
+    
+    key = key+"/"+name
+    pipe = s3_model_load(key)
+
+    op_model = OPTIMIZERS[optimizer](
+        estimator           = pipe,
+        param_distributions = params,
+        **kwargs        
+    )
+    
+    if save_name is not None:
+        key = key+"/"+save_name
+    
+    s3_model_save(key, op_model)

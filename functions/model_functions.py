@@ -1,73 +1,20 @@
 from typing import Optional
 from fastapi import Request, Query
-import json, pickle, boto3, io
+import json
 
 import pandas as pd
 # import modin.pandas as pd
 
-from sklearn.metrics import (
-    accuracy_score,
-    f1_score,
-    roc_auc_score,
-    precision_score,
-    recall_score,
-    
-    r2_score,
-    mean_absolute_error,
-    mean_squared_error,
+
+
+from .internal_func import (
+    s3_model_save, 
+    s3_model_load, 
+    boolean,
+    MODELS,
+    METRICS,
 )
-from .make_model import MODELS, BUCKET
 
-METRICS = {
-    ## Classification
-    "accuracy"         : accuracy_score,
-    "f1"               : f1_score,
-    "roc_auc"          : roc_auc_score,  # requires predict_proba support
-    "precision"        : precision_score,
-    "recall"           : recall_score,
-    # "balanced_accuracy": balanced_accuracy_score,
-    # "top_k_accuracy"   : top_k_accuracy_score,
-    # "average_precision": average_precision_score,
-    # "neg_brier_score"  : brier_score_loss,
-    # "neg_log_loss"     : log_loss, # requires predict_proba support
-    # "jaccard"          : jaccard_score,
-
-    ## Regression
-    "r2"                         :r2_score,
-    "neg_mean_absolute_error"    :mean_absolute_error,
-    "neg_mean_squared_error"     :mean_squared_error,
-    # "explained_variance"         :explained_variance_score,
-    # "max_error"                  :max_error,
-    # "neg_mean_squared_log_error" :mean_squared_log_error,
-    # "neg_median_absolute_error"  :median_absolute_error,
-    # "neg_mean_poisson_deviance"  :mean_poisson_deviance,
-    # "neg_mean_gamma_deviance"    :mean_gamma_deviance,
-    # "neg_mean_absolute_percentage_error":mean_absolute_percentage_error,
-}
-
-def boolean(x):
-    if   x.lower() == "true" : return True
-    elif x.lower() == "false": return False
-
-
-def s3_model_save(key, body):
-    s3 = boto3.client('s3') 
-    s3.put_object(
-        Bucket = BUCKET,
-        Key    = key,
-        Body   = pickle.dumps(body)
-    )
-
-
-def s3_model_load(key):
-    s3 = boto3.client('s3') 
-    file = io.BytesIO(
-        s3.get_object(
-            Bucket = BUCKET,
-            Key    = key
-        )["Body"].read()
-    )
-    return pickle.load(file)
 
 
 ## 나중에 sql로 바꿀 예정
@@ -308,7 +255,7 @@ async def model_predict(
     """
 
     # 데이터 로드
-    X_test = await item.json()
+    X_test = pd.read_json(await item.json())
 
     # proba = boolean(proba)
     # if proba is None: return '"proba" should be bool, "true" or "false"'
@@ -522,3 +469,5 @@ async def model_fit_predict_score(
     print(METRICS[metric](y_train, y_pred_train)) # train score
     print(METRICS[metric](y_valid, y_pred)) # valid score
     return {"Train_Score":str(METRICS[metric](y_train, y_pred_train)), "Valid Score":str(METRICS[metric](y_valid, y_pred))}
+
+
