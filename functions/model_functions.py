@@ -255,7 +255,7 @@ async def model_predict(
     """
 
     # 데이터 로드
-    X_test = await item.json()
+    X_test = pd.read_json(await item.json())
 
     # proba = boolean(proba)
     # if proba is None: return '"proba" should be bool, "true" or "false"'
