@@ -72,7 +72,7 @@ async def make_encoder(
     key = key+"/"+name
     s3_model_save(key, x)
 
-    return True, {"result": True, "message":f"Generation Complete: {x}"}
+    return True, {"result": True, "message": f"Generation Complete: {x}"}
 
 
 @check_error
@@ -365,7 +365,7 @@ async def make_optimizer(
 ) -> tuple:
 
     if optimizer not in OPTIMIZERS:
-        return False, "지원되지 않는 optimizer"
+        return False, {"result": False, "message": "지원되지 않는 optimizer"}
 
     save_name          = None    if save_name          == "" else save_name
     n_iter             = 10      if n_iter             == "" else n_iter
@@ -377,7 +377,7 @@ async def make_optimizer(
     
     # n_iter
     if isint(n_iter): n_iter = int(n_iter)
-    else            : return False, {"result": False, "message":"n_iter는 정수만 가능!"}
+    else            : return False, {"result": False, "message": "n_iter는 정수만 가능!"}
 
     # scoring
     if scoring is not None and scoring not in METRICS:
