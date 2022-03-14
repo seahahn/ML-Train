@@ -416,7 +416,7 @@ async def model_score(
             y_true = pd.read_json(i_y["y_true"])
             try:
                 y_pred = pd.read_json(i_y["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(i_y["y_pred"]) 
-                output[name] = f"{metric}:{METRICS[metric](y_true, y_pred)}"
+                output[name] = f"{METRICS[metric](y_true, y_pred)}"
                 print(output[name])
             except:
                 return False, f'"{metric}"은 회귀 모델에서 사용할 수 없습니다.'
@@ -468,7 +468,7 @@ async def model_predict_score(
             y_true = pd.read_json(i_y["y_true"])
             try:
                 y_pred = pd.read_json(i_y["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(i_y["y_pred"]) 
-                output[name] = f"{metric}:{METRICS[metric](y_true, y_pred)}"
+                output[name] = f"{METRICS[metric](y_true, y_pred)}"
                 print(output[name])
             except:
                 return False, f'"{metric}"은 회귀 모델에서 사용할 수 없습니다.'
@@ -539,7 +539,7 @@ async def model_fit_predict_score(
             y_true = pd.read_json(i_y["y_true"])
             try:
                 y_pred = pd.read_json(i_y["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(i_y["y_pred"]) 
-                output[name] = f"{metric}:{METRICS[metric](y_true, y_pred)}"
+                output[name] = f"{METRICS[metric](y_true, y_pred)}"
                 print(output[name])
             except:
                 return False, f'"{metric}"은 회귀 모델에서 사용할 수 없습니다.'
@@ -549,26 +549,3 @@ async def model_fit_predict_score(
 
     # 점수 값 리턴
     return True, output
-
-
-async def optimize(
-    item         : Request,
-    name         : str,
-    key          : str,
-    *,
-    other_metric : Optional[str] = Query(None, max_length=50),
-) -> tuple:
-
-
-    # 데이터 로드
-    item = await item.json()
-    X_train = pd.read_json(item["X_train"])
-    y_train = pd.read_json(item["y_train"])
-    
-    # 모델 로드
-    key = key+"/"+name
-    try   : op_model = s3_model_load(key)
-    except: return False, "모델을 불러오는데 실패하였습니다."
-
-    op_model.fit(X_train, y_train)
-    

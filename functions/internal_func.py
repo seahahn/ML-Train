@@ -92,8 +92,6 @@ OPTIMIZERS = {
     "grid_search_cv"      : GridSearchCV,
 }
 
-
-
 BUCKET = "aiplay-test-bucket"
 
 def s3_model_save(key, body):
