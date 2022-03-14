@@ -1,11 +1,8 @@
 from typing import Optional
 from fastapi import Request, Query
-import json
 
 import pandas as pd
 # import modin.pandas as pd
-
-
 
 from .internal_func import (
     s3_model_save, 
@@ -14,6 +11,7 @@ from .internal_func import (
     check_error,
     MODELS,
     METRICS,
+    OPTIMIZERS,
 )
 
 
@@ -245,25 +243,27 @@ async def model_fit(
 
     ## s3 에서 객체 불러오기
     key = key+"/"+name
-    try   : pipe = s3_model_load(key)
+    try   : model = s3_model_load(key)
     except: return False, "모델을 불러오는데 실패하였습니다."
 
-    ## 로컬에서 객체 불러오기(테스트용)
-    # with open("test_pipe.pickle", "rb") as f:
-    #     pipe = pickle.load(f)
-
     # 모델 학습
-    pipe.fit(X_train, y_train)
+    model.fit(X_train, y_train)
 
     # 학습된 객체 s3에 저장
-    try   : s3_model_save(key, pipe)
+    try   : s3_model_save(key, model)
     except: return False, "훈련에는 성공하였으나 모델 저장에 실패하였습니다.(알 수 없는 에러)"
 
     ## 예측 되는지 확인(테스트용)
     # return pd.DataFrame(pipe.predict(X_train), columns=["Predict"]).to_json(orient="records")
 
     # 훈련 완료 메시지 리턴
-    return True, "training completed"
+    type_model = type(model)
+    if type_model in OPTIMIZERS.values():
+        # optimizer
+        return True, f"optimizing completed, best parameters = {model.best_params_}, best score = {model.best_score_}"
+    else:
+        # single model or pipeline model
+        return True, "training completed"
 
 
 @check_error
@@ -293,7 +293,6 @@ async def model_predict(
 
     # 데이터 로드
     item = await item.json()
-    
 
     # proba = boolean(proba)
     # if proba is None: return False, '"proba" should be bool, "true" or "false"'
@@ -314,6 +313,8 @@ async def model_predict(
                     "y_pred"      : pd.DataFrame(pipe.predict(X)).to_json(orient="records"),
                     "y_pred_proba": pd.DataFrame(pipe.predict_proba(X)).to_json(orient="records")
                 }
+            except ValueError:
+                return False, "훈련되지 않은 함수입니다. fit 함수를 실행 후 다시 predict 함수를 해주세요."  
             except:
                 output[name] = {
                     "y_pred": pd.DataFrame(pipe.predict(X)).to_json(orient="records")
@@ -550,7 +551,7 @@ async def model_fit_predict_score(
     return True, output
 
 
-async def optimizer_fit(
+async def optimize(
     item         : Request,
     name         : str,
     key          : str,
@@ -563,9 +564,7 @@ async def optimizer_fit(
     item = await item.json()
     X_train = pd.read_json(item["X_train"])
     y_train = pd.read_json(item["y_train"])
-    X_valid = pd.read_json(item["X_valid"])
-    y_valid = pd.read_json(item["y_valid"])
-
+    
     # 모델 로드
     key = key+"/"+name
     try   : op_model = s3_model_load(key)
