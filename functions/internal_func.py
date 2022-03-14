@@ -147,10 +147,13 @@ def save_log(query):
 from typing import Optional
 from fastapi import Header
 import datetime, inspect
+import traceback
+
 def check_error(func):
     async def wrapper(*args, user_id: Optional[str] = Header(None), **kwargs):
         name = func.__name__
         start = datetime.datetime.now()
+        print(user_id)
         try:
             tf, return_value = await func(*args, **kwargs)
             end = datetime.datetime.now()
@@ -160,12 +163,13 @@ def check_error(func):
             save_log(query)
             return return_value
         except:
+            print(traceback.format_exc())
             end = datetime.datetime.now()
             # Unexpected error
             query = """비정상적인 동작"""
             is_worked = 2
             save_log(query)
-            return "알 수 없는 에러 발생"
+            return traceback.format_exc()
     
     ## FastAPI 에서 데코레이터를 사용할 수 있도록 파라미터 수정
     wrapper.__signature__ = inspect.Signature(
@@ -180,5 +184,11 @@ def check_error(func):
         ],
         return_annotation = inspect.signature(func).return_annotation,
     )
+
+    # 나머지 요소를 func으로부터 가져오기
+    wrapper.__module__ = func.__module__
+    wrapper.__doc__  = func.__doc__
+    wrapper.__name__ = func.__name__
+    wrapper.__qualname__ = func.__qualname__
 
     return wrapper
