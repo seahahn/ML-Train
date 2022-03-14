@@ -16,6 +16,7 @@ from functions.make_model import (
     make_scaler,
     make_model,
     make_pipeline,
+    make_optimizer,
 )
 
 __all__ = [
@@ -35,5 +36,6 @@ __all__ = [
     "make_scaler",
     "make_model",
     "make_pipeline",
+    "make_optimizer",
 ]
 

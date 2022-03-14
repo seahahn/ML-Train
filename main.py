@@ -32,6 +32,7 @@ from functions import (
     make_scaler,
     make_model,
     make_pipeline,
+    make_optimizer,
 )
 
 model_steps             = app.get ("/model/steps")            (model_steps)
@@ -48,7 +49,8 @@ model_predict_score     = app.post("/model/predict_score")    (model_predict_sco
 model_fit_predict_score = app.post("/model/fit_predict_score")(model_fit_predict_score)
 
 
-make_encoder  = app.post("/model/make_encoder") (make_encoder)
-make_scaler   = app.post("/model/make_scaler")  (make_scaler)
-make_model    = app.post("/model/make_model")   (make_model)
-make_pipeline = app.post("/model/make_pipeline")(make_pipeline)
+make_encoder   = app.post("/model/make_encoder")  (make_encoder)
+make_scaler    = app.post("/model/make_scaler")   (make_scaler)
+make_model     = app.post("/model/make_model")    (make_model)
+make_pipeline  = app.post("/model/make_pipeline") (make_pipeline)
+make_optimizer = app.post("/model/make_optimizer")(make_optimizer)
