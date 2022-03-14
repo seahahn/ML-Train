@@ -1,5 +1,4 @@
 from typing import Optional
-from category_encoders import OneHotEncoder
 from fastapi import Request, Query
 
 # import json
@@ -16,6 +15,7 @@ from .internal_func import (
     s3_model_load, 
     boolean,
     isint,
+    check_error,
     ENCODERS,
     SCALERS,
     MODELS,
@@ -24,12 +24,13 @@ from .internal_func import (
 )
 
 
+@check_error
 async def make_encoder(
     item   : Request,
     name   : str, # 저장 될 이름.
     key    : str, # 키를 생성해서 리턴해야 하는지 생각중입니다!
     encoder: str,
-) -> str:
+) -> tuple:
     """
     ```
     아래의 인코더 중 하나를 선택해서 객체를 생성함.
@@ -57,7 +58,7 @@ async def make_encoder(
     params = await item.json()
     
     if encoder not in ENCODERS:
-        return f'"encoder" should be in {list(ENCODERS)}. current {encoder}'
+        return False, {"result": False, "message": f'"encoder" should be in {list(ENCODERS)}. current {encoder}'}
     
     # encoders[encoder](**params["encoders"][encoder])
     # encoders[encoder](**params[encoder])
@@ -71,15 +72,16 @@ async def make_encoder(
     key = key+"/"+name
     s3_model_save(key, x)
 
-    return f"Generation Complete: {x}"
+    return True, {"result": True, "message": f"Generation Complete: {x}"}
 
 
+@check_error
 async def make_scaler(
     item  : Request,
     name  : str, # 저장 될 이름.
     key   : str, # 키를 생성해서 리턴해야 하는지 생각중입니다!
     scaler: str,
-) -> str:
+) -> tuple:
     """
     ```
     아래의 스케일러 중 하나를 선택해서 객체를 생성함.
@@ -107,7 +109,7 @@ async def make_scaler(
     params = await item.json()
 
     if scaler not in SCALERS:
-        return f'"scaler" should be in {list(SCALERS)}. current {scaler}'
+        return False, {"result": False, "message": f'"scaler" should be in {list(SCALERS)}. current {scaler}'}
 
     # scalers[scaler](**params[scaler])
     x = SCALERS[scaler](**params)
@@ -120,15 +122,17 @@ async def make_scaler(
     key = key+"/"+name
     s3_model_save(key, x)
 
-    return f"Generation Complete: {x}"
+    return True, {"result": True, "message": f"Generation Complete: {x}"}
 
 
+
+@check_error
 async def make_model(
     item  : Request,
     name  : str, # 저장 될 이름.
     key   : str, # 키를 생성해서 리턴해야 하는지 생각중입니다!
     model : str,
-) -> str:
+) -> tuple:
     """
     ```
     아래 모델 중 하나를 선택해서 객체를 생성함.
@@ -156,7 +160,7 @@ async def make_model(
     params = await item.json()
     
     if model not in MODELS:
-        return f'"model" should be in {list(MODELS)}. current {model}'
+        return False, {"result": False, "message": f'"model" should be in {list(MODELS)}. current {model}'}
     
     # models[model](**params[model])
     x = MODELS[model](**params)
@@ -169,9 +173,10 @@ async def make_model(
     key = key+"/"+name
     s3_model_save(key, x)
 
-    return f"Generation Complete: {x}"
+    return True, {"result": True, "message": f"Generation Complete: {x}"}
 
 
+@check_error
 async def make_pipeline(
     item   : Request,
     name   : str, # 저장 될 이름.
@@ -182,7 +187,7 @@ async def make_pipeline(
     model  : Optional[str] = Query(None,    max_length=50),
     memory : Optional[str] = Query(None,    max_length=50),
     verbose: Optional[str] = Query("false", max_length=50),
-) -> str:
+) -> tuple:
     """
     ```
     
@@ -245,20 +250,20 @@ async def make_pipeline(
             try   : 
                 encoder = [i.strip() for i in encoder.split(",") if i.strip() != ""]
                 if not set(encoder) <= set(ENCODERS):
-                    return f'"encoder" should be in {list(ENCODERS)}. current {encoder}'
-            except: return '"encoder" should be array(column names) divied by ","'
+                    return False, {"result": False, "message": f'"encoder" should be in {list(ENCODERS)}. current {encoder}'}
+            except: return False, {"result": False, "message": '"encoder" should be array(column names) divied by ","'}
     
     if scaler is not None and scaler not in SCALERS:
-        return f'"scaler" should be in {list(SCALERS)}. current {scaler}'
+        return False, {"result": False, "message": f'"scaler" should be in {list(SCALERS)}. current {scaler}'}
     
     if model is not None and model not in MODELS:
-        return f'"model" should be in {list(MODELS)}. current {model}'
+        return False, {"result": False, "message": f'"model" should be in {list(MODELS)}. current {model}'}
 
     if not (encoder or scaler or model):
-        return "At least an encoder, a scaler or a model is needed."
+        return False, {"result": False, "message": "At least an encoder, a scaler or a model is needed."}
 
     verbose = boolean(verbose)
-    if verbose is None: return '"verbose" should be bool, "true" or "false"'
+    if verbose is None: return False, {"result": False, "message": '"verbose" should be bool, "true" or "false"'}
 
     # 테스트용
     # encoder = ["onehot_encoder"]
@@ -308,15 +313,15 @@ async def make_pipeline(
     if encoder is not None: 
         for i in encoder:
             try: steps.append((i, ENCODERS[i](**params["encoders"][i]))) 
-            except: return "올바르지 않은 인코더 이름"
+            except: return False, {"result": False, "message": "올바르지 않은 인코더 이름"}
     
     if scaler is not None:
         try: steps.append((scaler, SCALERS[scaler](**params["scaler"])))
-        except: return "올바르지 않은 스케일러 이름"
+        except: return False, {"result": False, "message": "올바르지 않은 스케일러 이름"}
     
     if model is not None:
         try: steps.append((model, MODELS[model](**params["model"])))
-        except: return "올바르지 않은 모델 이름"
+        except: return False, {"result": False, "message": "올바르지 않은 모델 이름"}
 
     pipe = Pipeline(
         steps   = steps,
@@ -336,11 +341,10 @@ async def make_pipeline(
     # with open("test_pipe.pickle", "wb") as f:
     #     pickle.dump(pipe, f)
 
-    return {"result": True, "message":f"Generated Model: {pipe}"}
+    return True, {"result": True, "message": f"Generated Model: {pipe}"}
 
 
-# RandomizedSearchCV, GridSearchCV
-
+@check_error
 async def make_optimizer(
     item              : Request,
     name              : str, # 불러올 모델 이름.
@@ -358,10 +362,10 @@ async def make_optimizer(
     # verbose
     # pre_dispatch
     # error_score
-) -> str:
+) -> tuple:
 
     if optimizer not in OPTIMIZERS:
-        return "지원되지 않는 optimizer"
+        return False, {"result": False, "message": "지원되지 않는 optimizer"}
 
     save_name          = None    if save_name          == "" else save_name
     n_iter             = 10      if n_iter             == "" else n_iter
@@ -373,29 +377,29 @@ async def make_optimizer(
     
     # n_iter
     if isint(n_iter): n_iter = int(n_iter)
-    else            : return "n_iter는 정수만 가능!"        
+    else            : return False, {"result": False, "message": "n_iter는 정수만 가능!"}
 
     # scoring
     if scoring is not None and scoring not in METRICS:
-        return f"scoring은 반드시 {list(METRICS)}안에 포함되어야 함!"
+        return False, {"result": False, "message": f"scoring은 반드시 {list(METRICS)}안에 포함되어야 함!"}
 
     # n_jobs
     if isint(n_jobs): n_jobs = int(n_jobs)
-    else            : return "n_jobs는 정수만 가능!"        
+    else            : return False, {"result": False, "message": "n_jobs는 정수만 가능!"}
 
     # cv
     if isint(cv): cv = int(cv)
-    else        : return "cv는 정수만 가능!"        
+    else        : return False, {"result": False, "message": "cv는 정수만 가능!"}
 
     # random_state
     if random_state is not None:
         if isint(random_state): random_state = int(random_state)
-        else                  : return "random_state는 정수만 가능!"
+        else                  : return False, {"result": False, "message": "random_state는 정수만 가능!"}
 
     # return_train_score
     return_train_score = boolean(return_train_score)
     if return_train_score is None:
-        return "return_train_score should be true or false"
+        return False, {"result": False, "message": "return_train_score should be true or false"}
 
     # 사용하지 않는 파라미터
     # refit
@@ -420,22 +424,29 @@ async def make_optimizer(
         "encoder__max": "_randexp,10,-10,-4"
     }
 
-    params:dict = await item.json()
+    i_params:dict = await item.json()
+    params:dict = {}
+    for model_name, model_params in i_params.items():
+        for param_name, param in model_params.items():
+            i = model_name + "__" + param_name
+            if   param[0] == "_randint": # ex) "randint,-3,3" => [-3,-2,-1,0,1,2,3]
+                params[i] = randint(int(param[1]),int(param[2]))
 
-    for i, v in params.items():
-        x = v.split(",")
-        if   x[0] == "_randint": # ex) "randint,-3,3" => [-3,-2,-1,0,1,2,3]
-            params[i] = randint(int(x[1]),int(x[2]))
-        elif x[0] == "_randexp": # ex) "randexp,10,-3,3" => [0.001, 0.01, 0.1, 1, 10, 100, 1000]
-            params[i] = int(x[1])**randint(int(x[2]),int(x[3]))
-        elif x[0] == "_uniform": # ex) "uniform,0,1" => 0.0 ~ 1.0 사이의 값을 균일 확률로...?
-            params[i] = uniform(int(x[1]),int(x[2]))
-        else:
-            # 숫자형일 경우 숫자형 리스트로 변환
-            try:
-                params[i] = [float(k) for k in x]
-            except:
-                params[i] = [k.strip() for k in x]
+            elif param[0] == "_randexp": # ex) "randexp,10,-3,3" => [0.001, 0.01, 0.1, 1, 10, 100, 1000]
+                params[i] = [int(param[1])**x.rvs() for x in uniform(int(param[2]),int(param[3]) - int(param[2]))]
+
+            elif param[0] == "_uniform": # ex) "uniform,0,1" => 0.0 ~ 1.0 사이의 값을 균일 확률로...?
+                params[i] = uniform(int(param[1]),int(param[2]) - int(param[1]))
+                
+            elif param[0] == "_discrete":
+                try: # 숫자형일 경우 숫자형 리스트로 변환
+                    params[i] = [float(k) for k in param[1].split(",")]
+                except:
+                    return False, {"result": False, "message": "입력된 값이 숫자가 아닙니다."}
+            else:
+                params[i] = param
+
+    print(params)
 
     kwargs = {
         "n_iter"            : n_iter,
@@ -466,3 +477,6 @@ async def make_optimizer(
         key = key+"/"+save_name
     
     s3_model_save(key, op_model)
+
+    return True, {"result": True, "message": f"Generated Optimizer: {op_model}"}
+
