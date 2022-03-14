@@ -3,7 +3,7 @@ from fastapi import Request, Query
 
 # import json
 # import numpy as np
-from scipy.stats import randint, uniform
+from scipy.stats import randint, uniform, loguniform
 # import pandas as pd
 # import modin.pandas as pd
 
@@ -433,7 +433,8 @@ async def make_optimizer(
                 params[i] = randint(int(param[1]),int(param[2]))
 
             elif param[0] == "_randexp": # ex) "randexp,10,-3,3" => [0.001, 0.01, 0.1, 1, 10, 100, 1000]
-                params[i] = [int(param[1])**x.rvs() for x in uniform(int(param[2]),int(param[3]) - int(param[2]))]
+                params[i] = loguniform(float(param[1])**int(param[2]), float(param[1])**int(param[3]))
+                # params[i] = loguniform(float(param[1]), float(param[2]))
 
             elif param[0] == "_uniform": # ex) "uniform,0,1" => 0.0 ~ 1.0 사이의 값을 균일 확률로...?
                 params[i] = uniform(int(param[1]),int(param[2]) - int(param[1]))
