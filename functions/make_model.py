@@ -58,7 +58,7 @@ async def make_encoder(
     params = await item.json()
     
     if encoder not in ENCODERS:
-        return False, f'"encoder" should be in {list(ENCODERS)}. current {encoder}'
+        return False, {"result": False, "message": f'"encoder" should be in {list(ENCODERS)}. current {encoder}'}
     
     # encoders[encoder](**params["encoders"][encoder])
     # encoders[encoder](**params[encoder])
@@ -109,7 +109,7 @@ async def make_scaler(
     params = await item.json()
 
     if scaler not in SCALERS:
-        return False, f'"scaler" should be in {list(SCALERS)}. current {scaler}'
+        return False, {"result": False, "message": f'"scaler" should be in {list(SCALERS)}. current {scaler}'}
 
     # scalers[scaler](**params[scaler])
     x = SCALERS[scaler](**params)
@@ -122,7 +122,7 @@ async def make_scaler(
     key = key+"/"+name
     s3_model_save(key, x)
 
-    return True, {"result": True, "message":f"Generation Complete: {x}"}
+    return True, {"result": True, "message": f"Generation Complete: {x}"}
 
 
 
@@ -160,7 +160,7 @@ async def make_model(
     params = await item.json()
     
     if model not in MODELS:
-        return False, f'"model" should be in {list(MODELS)}. current {model}'
+        return False, {"result": False, "message": f'"model" should be in {list(MODELS)}. current {model}'}
     
     # models[model](**params[model])
     x = MODELS[model](**params)
@@ -173,7 +173,7 @@ async def make_model(
     key = key+"/"+name
     s3_model_save(key, x)
 
-    return True, {"result": True, "message":f"Generation Complete: {x}"}
+    return True, {"result": True, "message": f"Generation Complete: {x}"}
 
 
 @check_error
@@ -250,20 +250,20 @@ async def make_pipeline(
             try   : 
                 encoder = [i.strip() for i in encoder.split(",") if i.strip() != ""]
                 if not set(encoder) <= set(ENCODERS):
-                    return False, f'"encoder" should be in {list(ENCODERS)}. current {encoder}'
-            except: return False, '"encoder" should be array(column names) divied by ","'
+                    return False, {"result": False, "message": f'"encoder" should be in {list(ENCODERS)}. current {encoder}'}
+            except: return False, {"result": False, "message": '"encoder" should be array(column names) divied by ","'}
     
     if scaler is not None and scaler not in SCALERS:
-        return False, f'"scaler" should be in {list(SCALERS)}. current {scaler}'
+        return False, {"result": False, "message": f'"scaler" should be in {list(SCALERS)}. current {scaler}'}
     
     if model is not None and model not in MODELS:
-        return False, f'"model" should be in {list(MODELS)}. current {model}'
+        return False, {"result": False, "message": f'"model" should be in {list(MODELS)}. current {model}'}
 
     if not (encoder or scaler or model):
-        return False, "At least an encoder, a scaler or a model is needed."
+        return False, {"result": False, "message": "At least an encoder, a scaler or a model is needed."}
 
     verbose = boolean(verbose)
-    if verbose is None: return False, '"verbose" should be bool, "true" or "false"'
+    if verbose is None: return False, {"result": False, "message": '"verbose" should be bool, "true" or "false"'}
 
     # 테스트용
     # encoder = ["onehot_encoder"]
@@ -313,15 +313,15 @@ async def make_pipeline(
     if encoder is not None: 
         for i in encoder:
             try: steps.append((i, ENCODERS[i](**params["encoders"][i]))) 
-            except: return False, "올바르지 않은 인코더 이름"
+            except: return False, {"result": False, "message": "올바르지 않은 인코더 이름"}
     
     if scaler is not None:
         try: steps.append((scaler, SCALERS[scaler](**params["scaler"])))
-        except: return False, "올바르지 않은 스케일러 이름"
+        except: return False, {"result": False, "message": "올바르지 않은 스케일러 이름"}
     
     if model is not None:
         try: steps.append((model, MODELS[model](**params["model"])))
-        except: return False, "올바르지 않은 모델 이름"
+        except: return False, {"result": False, "message": "올바르지 않은 모델 이름"}
 
     pipe = Pipeline(
         steps   = steps,
@@ -341,7 +341,7 @@ async def make_pipeline(
     # with open("test_pipe.pickle", "wb") as f:
     #     pickle.dump(pipe, f)
 
-    return True, {"result": True, "message":f"Generated Model: {pipe}"}
+    return True, {"result": True, "message": f"Generated Model: {pipe}"}
 
 
 @check_error
@@ -377,29 +377,29 @@ async def make_optimizer(
     
     # n_iter
     if isint(n_iter): n_iter = int(n_iter)
-    else            : return False, "n_iter는 정수만 가능!"        
+    else            : return False, {"result": False, "message":"n_iter는 정수만 가능!"}
 
     # scoring
     if scoring is not None and scoring not in METRICS:
-        return False, f"scoring은 반드시 {list(METRICS)}안에 포함되어야 함!"
+        return False, {"result": False, "message": f"scoring은 반드시 {list(METRICS)}안에 포함되어야 함!"}
 
     # n_jobs
     if isint(n_jobs): n_jobs = int(n_jobs)
-    else            : return False, "n_jobs는 정수만 가능!"        
+    else            : return False, {"result": False, "message": "n_jobs는 정수만 가능!"}
 
     # cv
     if isint(cv): cv = int(cv)
-    else        : return False, "cv는 정수만 가능!"        
+    else        : return False, {"result": False, "message": "cv는 정수만 가능!"}
 
     # random_state
     if random_state is not None:
         if isint(random_state): random_state = int(random_state)
-        else                  : return False, "random_state는 정수만 가능!"
+        else                  : return False, {"result": False, "message": "random_state는 정수만 가능!"}
 
     # return_train_score
     return_train_score = boolean(return_train_score)
     if return_train_score is None:
-        return False, "return_train_score should be true or false"
+        return False, {"result": False, "message": "return_train_score should be true or false"}
 
     # 사용하지 않는 파라미터
     # refit
@@ -442,7 +442,7 @@ async def make_optimizer(
                 try: # 숫자형일 경우 숫자형 리스트로 변환
                     params[i] = [float(k) for k in param[1].split(",")]
                 except:
-                    return False, "입력된 값이 숫자가 아닙니다."
+                    return False, {"result": False, "message": "입력된 값이 숫자가 아닙니다."}
             else:
                 params[i] = param
 
@@ -478,5 +478,5 @@ async def make_optimizer(
     
     s3_model_save(key, op_model)
 
-    return True, {"result": True, "message":f"Generated Optimizer: {op_model}"}
+    return True, {"result": True, "message": f"Generated Optimizer: {op_model}"}
 
