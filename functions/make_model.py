@@ -442,7 +442,7 @@ async def make_optimizer(
                 try: # 숫자형일 경우 숫자형 리스트로 변환
                     params[i] = [float(k) for k in param[1].split(",")]
                 except:
-                    return "입력된 값이 숫자가 아닙니다."
+                    return False, "입력된 값이 숫자가 아닙니다."
             else:
                 params[i] = param
 
@@ -479,3 +479,4 @@ async def make_optimizer(
     s3_model_save(key, op_model)
 
     return True, {"result": True, "message":f"Generated Optimizer: {op_model}"}
+
