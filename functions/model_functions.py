@@ -1,11 +1,8 @@
 from typing import Optional
 from fastapi import Request, Query
-import json
 
 import pandas as pd
 # import modin.pandas as pd
-
-
 
 from .internal_func import (
     s3_model_save, 
@@ -14,6 +11,7 @@ from .internal_func import (
     check_error,
     MODELS,
     METRICS,
+    OPTIMIZERS,
 )
 
 
@@ -245,25 +243,27 @@ async def model_fit(
 
     ## s3 에서 객체 불러오기
     key = key+"/"+name
-    try   : pipe = s3_model_load(key)
+    try   : model = s3_model_load(key)
     except: return False, "모델을 불러오는데 실패하였습니다."
 
-    ## 로컬에서 객체 불러오기(테스트용)
-    # with open("test_pipe.pickle", "rb") as f:
-    #     pipe = pickle.load(f)
-
     # 모델 학습
-    pipe.fit(X_train, y_train)
+    model.fit(X_train, y_train)
 
     # 학습된 객체 s3에 저장
-    try   : s3_model_save(key, pipe)
+    try   : s3_model_save(key, model)
     except: return False, "훈련에는 성공하였으나 모델 저장에 실패하였습니다.(알 수 없는 에러)"
 
     ## 예측 되는지 확인(테스트용)
     # return pd.DataFrame(pipe.predict(X_train), columns=["Predict"]).to_json(orient="records")
 
     # 훈련 완료 메시지 리턴
-    return True, "training completed"
+    type_model = type(model)
+    if type_model in OPTIMIZERS.values():
+        # optimizer
+        return True, f"optimizing completed, best parameters = {model.best_params_}, best score = {model.best_score_}"
+    else:
+        # single model or pipeline model
+        return True, "training completed"
 
 
 @check_error
@@ -293,7 +293,6 @@ async def model_predict(
 
     # 데이터 로드
     item = await item.json()
-    
 
     # proba = boolean(proba)
     # if proba is None: return False, '"proba" should be bool, "true" or "false"'
@@ -314,6 +313,8 @@ async def model_predict(
                     "y_pred"      : pd.DataFrame(pipe.predict(X)).to_json(orient="records"),
                     "y_pred_proba": pd.DataFrame(pipe.predict_proba(X)).to_json(orient="records")
                 }
+            except ValueError:
+                return False, "훈련되지 않은 함수입니다. fit 함수를 실행 후 다시 predict 함수를 해주세요."  
             except:
                 output[name] = {
                     "y_pred": pd.DataFrame(pipe.predict(X)).to_json(orient="records")
@@ -415,7 +416,7 @@ async def model_score(
             y_true = pd.read_json(i_y["y_true"])
             try:
                 y_pred = pd.read_json(i_y["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(i_y["y_pred"]) 
-                output[name] = f"{metric}:{METRICS[metric](y_true, y_pred)}"
+                output[name] = f"{METRICS[metric](y_true, y_pred)}"
                 print(output[name])
             except:
                 return False, f'"{metric}"은 회귀 모델에서 사용할 수 없습니다.'
@@ -467,7 +468,7 @@ async def model_predict_score(
             y_true = pd.read_json(i_y["y_true"])
             try:
                 y_pred = pd.read_json(i_y["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(i_y["y_pred"]) 
-                output[name] = f"{metric}:{METRICS[metric](y_true, y_pred)}"
+                output[name] = f"{METRICS[metric](y_true, y_pred)}"
                 print(output[name])
             except:
                 return False, f'"{metric}"은 회귀 모델에서 사용할 수 없습니다.'
@@ -538,7 +539,7 @@ async def model_fit_predict_score(
             y_true = pd.read_json(i_y["y_true"])
             try:
                 y_pred = pd.read_json(i_y["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(i_y["y_pred"]) 
-                output[name] = f"{metric}:{METRICS[metric](y_true, y_pred)}"
+                output[name] = f"{METRICS[metric](y_true, y_pred)}"
                 print(output[name])
             except:
                 return False, f'"{metric}"은 회귀 모델에서 사용할 수 없습니다.'
@@ -548,28 +549,3 @@ async def model_fit_predict_score(
 
     # 점수 값 리턴
     return True, output
-
-
-async def optimizer_fit(
-    item         : Request,
-    name         : str,
-    key          : str,
-    *,
-    other_metric : Optional[str] = Query(None, max_length=50),
-) -> tuple:
-
-
-    # 데이터 로드
-    item = await item.json()
-    X_train = pd.read_json(item["X_train"])
-    y_train = pd.read_json(item["y_train"])
-    X_valid = pd.read_json(item["X_valid"])
-    y_valid = pd.read_json(item["y_valid"])
-
-    # 모델 로드
-    key = key+"/"+name
-    try   : op_model = s3_model_load(key)
-    except: return False, "모델을 불러오는데 실패하였습니다."
-
-    op_model.fit(X_train, y_train)
-    
