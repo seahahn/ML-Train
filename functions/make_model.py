@@ -384,8 +384,9 @@ async def make_optimizer(
         return False, {"result": False, "message": f"scoring은 반드시 {list(METRICS)}안에 포함되어야 함!"}
 
     # n_jobs
-    if isint(n_jobs): n_jobs = int(n_jobs)
-    else            : return False, {"result": False, "message": "n_jobs는 정수만 가능!"}
+    if n_jobs is not None:
+        if isint(n_jobs): n_jobs = int(n_jobs)
+        else            : return False, {"result": False, "message": "n_jobs는 정수만 가능!"}
 
     # cv
     if isint(cv): cv = int(cv)
@@ -429,8 +430,11 @@ async def make_optimizer(
     for model_name, model_params in i_params.items():
         for param_name, param in model_params.items():
             i = model_name + "__" + param_name
+            if len(param) == 0:
+                continue
             if   param[0] == "_randint": # ex) "randint,-3,3" => [-3,-2,-1,0,1,2,3]
-                params[i] = randint(int(param[1]),int(param[2]))
+                try   : params[i] = randint(int(param[1]),int(param[2]))
+                except: continue
 
             elif param[0] == "_randexp": # ex) "randexp,10,-3,3" => [0.001, 0.01, 0.1, 1, 10, 100, 1000]
                 params[i] = loguniform(float(param[1])**int(param[2]), float(param[1])**int(param[3]))
@@ -465,8 +469,7 @@ async def make_optimizer(
     if optimizer == "grid_search_cv":
         del kwargs["n_iter"]
     
-    key = key+"/"+name
-    pipe = s3_model_load(key)
+    pipe = s3_model_load(key+"/"+name)
 
     op_model = OPTIMIZERS[optimizer](
         estimator           = pipe,
@@ -475,9 +478,9 @@ async def make_optimizer(
     )
     
     if save_name is not None:
-        key = key+"/"+save_name
+        name = save_name
     
-    s3_model_save(key, op_model)
+    s3_model_save(key+"/"+name, op_model)
 
     return True, {"result": True, "message": f"Generated Optimizer: {op_model}"}
 

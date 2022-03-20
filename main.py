@@ -36,7 +36,7 @@ from functions import (
 )
 
 model_steps             = app.get ("/model/steps")            (model_steps)
-model_steps_detail      = app.get ("/model/steps")            (model_steps_detail)
+model_steps_detail      = app.get ("/model/steps_detail")     (model_steps_detail)
 
 
 model_transform         = app.post("/model/transform")        (model_transform)
