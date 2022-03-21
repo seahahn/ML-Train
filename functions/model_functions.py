@@ -36,10 +36,17 @@ async def model_steps(
     ```
     """
     key = key+"/"+name
-    try   : pipe = s3_model_load(key)
+    try   : model = s3_model_load(key)
     except: return False, "모델을 불러오는데 실패하였습니다."
-    return True, [i for i in pipe.named_steps.keys()]
 
+    model_type = type(model)
+    if model_type in OPTIMIZERS:
+        if "best_estimator_" in model.__dict__:
+            return True, [i for i in model.best_estimator_.named_steps.keys()]
+        else: 
+            return False, "훈련되지 않은 옵티마이저 입니다."
+    else:
+        return True, [i for i in model.named_steps.keys()]
 
 @check_error
 async def model_steps_detail(
@@ -103,31 +110,38 @@ async def model_transform(
 
     ## s3 에서 객체 불러오기
     key = key+"/"+name
-    try   : pipe = s3_model_load(key)
+    try   : model = s3_model_load(key)
     except: return False, "모델을 불러오는데 실패하였습니다."
-    steps = pipe.named_steps
+
+    model_type = type(model)
+    if model_type in OPTIMIZERS:
+        if "best_estimator_" in model.__dict__:
+            steps = model.best_estimator_.named_steps
+        else: 
+            return False, "훈련되지 않은 옵티마이저 입니다."
+    else:
+        steps = model.named_steps
+
     if target is not None:
         if target not in set(steps):
             return False, f'"target" should be in pipe: {steps}'
 
-    try:
-        for key, v in list(steps.items()):
-            if key in MODELS:
-                break
-            if type(X) == pd.DataFrame:
-                cols = X.columns
-            X = v.transform(X)
-            if key == target:
-                if type(X) == pd.DataFrame:
-                    return True, X.to_json(orient="records")
-                else:
-                    return True, pd.DataFrame(X, columns=cols).to_json(orient="records")
+    for key, v in list(steps.items()):
+        if key in MODELS:
+            break
         if type(X) == pd.DataFrame:
-            return True, X.to_json(orient="records")
-        else:
-            return True, pd.DataFrame(X, columns=cols).to_json(orient="records")
-    except:
-        return False, "훈련되지 않은 모델입니다."
+            cols = X.columns
+        try   : X = v.transform(X)
+        except: return False, "훈련되지 않은 모델입니다."
+        if key == target:
+            if type(X) == pd.DataFrame:
+                return True, X.to_json(orient="records")
+            else:
+                return True, pd.DataFrame(X, columns=cols).to_json(orient="records")
+    if type(X) == pd.DataFrame:
+        return True, X.to_json(orient="records")
+    else:
+        return True, pd.DataFrame(X, columns=cols).to_json(orient="records")
 
 
 @check_error
@@ -306,21 +320,20 @@ async def model_predict(
     ## {"y_pred":..., "y_pred_proba":...}
     output = {}
     for name, X_json in item.items():
-        try:
-            X = pd.read_json(X_json)
-            try:
-                output[name] = {
-                    "y_pred"      : pd.DataFrame(pipe.predict(X)).to_json(orient="records"),
-                    "y_pred_proba": pd.DataFrame(pipe.predict_proba(X)).to_json(orient="records")
-                }
-            except ValueError:
-                return False, "훈련되지 않은 함수입니다. fit 함수를 실행 후 다시 predict 함수를 해주세요."  
-            except:
-                output[name] = {
-                    "y_pred": pd.DataFrame(pipe.predict(X)).to_json(orient="records")
-                }
-        except:
+        if X_json is None:
             continue
+        X = pd.read_json(X_json)
+        try:
+            output[name] = {
+                "y_pred"      : pd.DataFrame(pipe.predict(X)).to_json(orient="records"),
+                "y_pred_proba": pd.DataFrame(pipe.predict_proba(X)).to_json(orient="records")
+            }
+        except ValueError:
+            return False, "훈련되지 않은 함수입니다. fit 함수를 실행 후 다시 predict 함수를 해주세요."  
+        except:
+            output[name] = {
+                "y_pred": pd.DataFrame(pipe.predict(X)).to_json(orient="records")
+            }
     
     return True, output
 
@@ -362,19 +375,18 @@ async def model_fit_predict(
     ## {"y_pred":..., "y_pred_proba":...}
     output = {}
     for name, X_json in item.items():
-        try:
-            X = pd.read_json(X_json)
-            try:
-                output[name] = {
-                    "y_pred"      : pd.DataFrame(pipe.predict(X)).to_json(orient="records"),
-                    "y_pred_proba": pd.DataFrame(pipe.predict_proba(X)).to_json(orient="records")
-                }
-            except:
-                output[name] = {
-                    "y_pred": pd.DataFrame(pipe.predict(X)).to_json(orient="records")
-                }
-        except:
+        if X_json is None:
             continue
+        X = pd.read_json(X_json)
+        try:
+            output[name] = {
+                "y_pred"      : pd.DataFrame(pipe.predict(X)).to_json(orient="records"),
+                "y_pred_proba": pd.DataFrame(pipe.predict_proba(X)).to_json(orient="records")
+            }
+        except:
+            output[name] = {
+                "y_pred": pd.DataFrame(pipe.predict(X)).to_json(orient="records")
+            }
     
     return True, output
 
@@ -412,18 +424,19 @@ async def model_score(
 
     output = {}
     for name, i_y in item.items():
-        try:
-            y_true = pd.read_json(i_y["y_true"])
-            try:
-                y_pred = pd.read_json(i_y["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(i_y["y_pred"]) 
-                output[name] = f"{METRICS[metric](y_true, y_pred)}"
-                print(output[name])
-            except:
-                return False, f'"{metric}"은 회귀 모델에서 사용할 수 없습니다.'
-                # roc_auc 는 y_pred가 predict proba가 들어가야함
-        except:
+        if i_y is None:
             continue
-    
+
+        y_true = pd.read_json(i_y["y_true"])
+
+        try:
+            y_pred = pd.read_json(i_y["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(i_y["y_pred"]) 
+            output[name] = f"{METRICS[metric](y_true, y_pred)}"
+        
+        except:
+            # roc_auc 는 y_pred가 predict proba가 들어가야함
+            return False, f'"{metric}"은 회귀 모델에서 사용할 수 없습니다.'
+        
     # 점수 값 리턴
     return True, output
 
@@ -447,34 +460,33 @@ async def model_predict_score(
     # predict
     y_preds = {}
     for name, X_json in item.items():
-        try:
-            X = pd.read_json(X_json)
-            try:
-                y_preds[name] = {
-                    "y_pred"      : pd.DataFrame(pipe.predict(X)).to_json(orient="records"),
-                    "y_pred_proba": pd.DataFrame(pipe.predict_proba(X)).to_json(orient="records")
-                }
-            except:
-                y_preds[name] = {
-                    "y_pred": pd.DataFrame(pipe.predict(X)).to_json(orient="records")
-                }
-        except:
+        if X_json is None:
             continue
+        X = pd.read_json(X_json)
+        try:
+            y_preds[name] = {
+                "y_pred"      : pd.DataFrame(pipe.predict(X)).to_json(orient="records"),
+                "y_pred_proba": pd.DataFrame(pipe.predict_proba(X)).to_json(orient="records")
+            }
+        except:
+            y_preds[name] = {
+                "y_pred": pd.DataFrame(pipe.predict(X)).to_json(orient="records")
+            }
+
     
     # score
     output = {}
     for name, i_y in y_preds.items():
-        try:
-            y_true = pd.read_json(i_y["y_true"])
-            try:
-                y_pred = pd.read_json(i_y["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(i_y["y_pred"]) 
-                output[name] = f"{METRICS[metric](y_true, y_pred)}"
-                print(output[name])
-            except:
-                return False, f'"{metric}"은 회귀 모델에서 사용할 수 없습니다.'
-                # roc_auc 는 y_pred가 predict proba가 들어가야함
-        except:
+        if i_y is None:
             continue
+        y_true = pd.read_json(i_y["y_true"])
+        try:
+            y_pred = pd.read_json(i_y["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(i_y["y_pred"]) 
+            output[name] = f"{METRICS[metric](y_true, y_pred)}"
+            print(output[name])
+        except:
+            return False, f'"{metric}"은 회귀 모델에서 사용할 수 없습니다.'
+            # roc_auc 는 y_pred가 predict proba가 들어가야함
     
     # 점수 값 리턴
     return True, output
@@ -518,34 +530,32 @@ async def model_fit_predict_score(
     # predict
     y_preds = {}
     for name, X_json in item.items():
-        try:
-            X = pd.read_json(X_json)
-            try:
-                y_preds[name] = {
-                    "y_pred"      : pd.DataFrame(pipe.predict(X)).to_json(orient="records"),
-                    "y_pred_proba": pd.DataFrame(pipe.predict_proba(X)).to_json(orient="records")
-                }
-            except:
-                y_preds[name] = {
-                    "y_pred": pd.DataFrame(pipe.predict(X)).to_json(orient="records")
-                }
-        except:
+        if X_json is None:
             continue
+        X = pd.read_json(X_json)
+        try:
+            y_preds[name] = {
+                "y_pred"      : pd.DataFrame(pipe.predict(X)).to_json(orient="records"),
+                "y_pred_proba": pd.DataFrame(pipe.predict_proba(X)).to_json(orient="records")
+            }
+        except:
+            y_preds[name] = {
+                "y_pred": pd.DataFrame(pipe.predict(X)).to_json(orient="records")
+            }
 
     # score
     output = {}
     for name, i_y in y_preds.items():
-        try:
-            y_true = pd.read_json(i_y["y_true"])
-            try:
-                y_pred = pd.read_json(i_y["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(i_y["y_pred"]) 
-                output[name] = f"{METRICS[metric](y_true, y_pred)}"
-                print(output[name])
-            except:
-                return False, f'"{metric}"은 회귀 모델에서 사용할 수 없습니다.'
-                # roc_auc 는 y_pred가 predict proba가 들어가야함
-        except:
+        if i_y is None:
             continue
+        y_true = pd.read_json(i_y["y_true"])
+        try:
+            y_pred = pd.read_json(i_y["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(i_y["y_pred"]) 
+            output[name] = f"{METRICS[metric](y_true, y_pred)}"
+            print(output[name])
+        except:
+            return False, f'"{metric}"은 회귀 모델에서 사용할 수 없습니다.'
+            # roc_auc 는 y_pred가 predict proba가 들어가야함
 
     # 점수 값 리턴
     return True, output

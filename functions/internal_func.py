@@ -1,4 +1,4 @@
-import pickle, boto3, io
+import pickle, boto3, io, json
 
 
 from sklearn.impute import SimpleImputer, KNNImputer
@@ -129,18 +129,28 @@ def isint(x:str) -> bool:
         return False
 
 
+# user_idx INTEGER NOT NULL, -- 사용자 고유번호
+# func_code VARCHAR(255) NOT NULL, -- 함수 기능 코드
+# is_worked INTEGER NOT NULL, -- 정상 작동 여부
+# error_msg TEXT NOT NULL DEFAULT '', -- Unexpected Error일 경우 저장되는 에러 메시지
+# start_time TIMESTAMP NOT NULL, -- 작동 시작 시각
+# end_time TIMESTAMP NOT NULL, -- 작동 종료 시각
+# created_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW() -- 생성 시점
+
 import psycopg2
+
 def save_log(query):
-    # params = json.load(".env")
-    # db = psycopg2.connect(
-    #     **params
-    # )
-    # cursor = db.cursor()
-    # insert_into = """INSERT INTO {schema}.{table}({column}) VALUES ('{data}')"""
-
-    # cursor.execute(query)
+    with open("functions/.env", "r") as f:
+        params = json.load(f)
+    db = psycopg2.connect(
+        **params
+    )
+    cursor = db.cursor()
+    cursor.execute(query)
     print(query)
-
+    cursor.close()
+    db.commit()
+    db.close()
 
 from typing import Optional
 from fastapi import Header
@@ -151,21 +161,24 @@ def check_error(func):
     async def wrapper(*args, user_id: Optional[str] = Header(None), **kwargs):
         name = func.__name__
         start = datetime.datetime.now()
-        print(user_id)
         try:
             tf, return_value = await func(*args, **kwargs)
             end = datetime.datetime.now()
             is_worked = 0 if tf else 1
             
-            query = """INSERT INTO {}.{}({}) VALUES ("{}")"""
+            query = f"""INSERT INTO 
+                public.func_log (user_idx, func_code, is_worked, start_time, end_time) 
+                VALUES ({user_id},'{name}',{is_worked}, '{start}', '{end}')"""
             save_log(query)
             return return_value
         except:
-            print(traceback.format_exc())
+            error = traceback.format_exc()
             end = datetime.datetime.now()
-            # Unexpected error
-            query = """비정상적인 동작"""
             is_worked = 2
+            # Unexpected error
+            query = f"""INSERT INTO 
+                public.func_log (user_idx, func_code, is_worked, error_msg, start_time, end_time) 
+                VALUES ({user_id},'{name}',{is_worked}, '{error}', '{start}', '{end}')"""
             save_log(query)
             return traceback.format_exc()
     
