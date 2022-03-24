@@ -157,17 +157,26 @@ def save_log(query):
     db.close()
 
 from typing import Optional
-from fastapi import Header
-import datetime, inspect
-import traceback
+from fastapi import Header, Cookie
+import datetime, inspect, traceback, jwt
+
+SECRET_KEY=os.getenv("SECRET_KEY")
 
 def check_error(func):
-    async def wrapper(*args, user_id: Optional[str] = Header(None), **kwargs):
+    async def wrapper(*args, user_id: Optional[str] = Header(None), access_token: Optional[str] = Cookie(None), **kwargs):
+        try:
+            # 토큰을 검증하여 유효한 토큰인지 확인
+            # JWT 토큰 인증되지 않으면 기능 작동 X (정상적인 사용자가 아닌 것으로 간주)
+            at = access_token
+            jwt.decode(at, SECRET_KEY, algorithms="HS256")
+        except Exception as e:
+            return {"result":False, "token_state":False, "message":str(e)}
+
         name = func.__name__
-        start = datetime.datetime.now()
+        start = datetime.datetime.now(datetime.timezone.utc)
         try:
             tf, return_value = await func(*args, **kwargs)
-            end = datetime.datetime.now()
+            end = datetime.datetime.now(datetime.timezone.utc)
             is_worked = 0 if tf else 1
 
             query = f"""INSERT INTO
@@ -177,7 +186,7 @@ def check_error(func):
             return return_value
         except:
             error = traceback.format_exc()
-            end = datetime.datetime.now()
+            end = datetime.datetime.now(datetime.timezone.utc)
             is_worked = 2
             # Unexpected error
             query = f"""INSERT INTO
