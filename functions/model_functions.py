@@ -483,7 +483,6 @@ async def model_predict_score(
         try:
             y_pred = pd.read_json(i_y["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(i_y["y_pred"]) 
             output[name] = f"{METRICS[metric](y_true, y_pred)}"
-            print(output[name])
         except:
             return False, f'"{metric}"은 회귀 모델에서 사용할 수 없습니다.'
             # roc_auc 는 y_pred가 predict proba가 들어가야함
@@ -552,7 +551,6 @@ async def model_fit_predict_score(
         try:
             y_pred = pd.read_json(i_y["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(i_y["y_pred"]) 
             output[name] = f"{METRICS[metric](y_true, y_pred)}"
-            print(output[name])
         except:
             return False, f'"{metric}"은 회귀 모델에서 사용할 수 없습니다.'
             # roc_auc 는 y_pred가 predict proba가 들어가야함

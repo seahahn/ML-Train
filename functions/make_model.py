@@ -451,8 +451,6 @@ async def make_optimizer(
             else:
                 params[i] = param
 
-    print(params)
-
     kwargs = {
         "n_iter"            : n_iter,
         "scoring"           : scoring,

@@ -151,7 +151,7 @@ def save_log(query):
     )
     cursor = db.cursor()
     cursor.execute(query)
-    print(query)
+
     cursor.close()
     db.commit()
     db.close()
