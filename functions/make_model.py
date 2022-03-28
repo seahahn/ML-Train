@@ -354,7 +354,7 @@ async def make_optimizer(
     save_name         : Optional[str] = Query(None,    max_length=50), # 다른 이름으로 저장
     n_iter            : Optional[str] = Query(10,      max_length=50),
     scoring           : Optional[str] = Query(None,    max_length=50),
-    n_jobs            : Optional[str] = Query(None,    max_length=50), # 멀티 유저를 상정하기 때문에 1로 고정하는 것이 어떨까요?
+    n_jobs            : Optional[str] = Query(1,       max_length=50), # 멀티 유저를 상정하기 때문에 1로 고정하는 것이 어떨까요?
     cv                : Optional[str] = Query(5,       max_length=50), # None, to use the default 5-fold cross validation
     random_state      : Optional[str] = Query(None,    max_length=50),
     return_train_score: Optional[str] = Query("false", max_length=50),
@@ -370,7 +370,7 @@ async def make_optimizer(
     save_name          = None    if save_name          == "" else save_name
     n_iter             = 10      if n_iter             == "" else n_iter
     scoring            = None    if scoring            == "" else scoring
-    n_jobs             = None    if n_jobs             == "" else n_jobs
+    n_jobs             = 1       if n_jobs             == "" else n_jobs
     cv                 = 5       if cv                 == "" else cv
     random_state       = None    if random_state       == "" else random_state
     return_train_score = "false" if return_train_score == "" else return_train_score

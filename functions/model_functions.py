@@ -40,7 +40,7 @@ async def model_steps(
     except: return False, "모델을 불러오는데 실패하였습니다."
 
     model_type = type(model)
-    if model_type in OPTIMIZERS:
+    if model_type in OPTIMIZERS.values():
         if "best_estimator_" in model.__dict__:
             return True, [i for i in model.best_estimator_.named_steps.keys()]
         else: 
@@ -114,7 +114,7 @@ async def model_transform(
     except: return False, "모델을 불러오는데 실패하였습니다."
 
     model_type = type(model)
-    if model_type in OPTIMIZERS:
+    if model_type in OPTIMIZERS.values():
         if "best_estimator_" in model.__dict__:
             steps = model.best_estimator_.named_steps
         else: 
