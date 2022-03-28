@@ -422,13 +422,16 @@ async def model_score(
     """
     # 데이터 로드
     # {"y_ture":..., "y_pred":..., *, "y_pred_proba":...}
+    
     item = await item.json()
 
     output = {}
     for name, i_y in item.items():
         if i_y is None:
             continue
-
+        
+        print(name)
+        print(i_y)
         y_true = pd.read_json(i_y["y_true"])
 
         try:
