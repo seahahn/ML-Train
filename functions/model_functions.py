@@ -5,8 +5,8 @@ import pandas as pd
 # import modin.pandas as pd
 
 from .internal_func import (
-    s3_model_save, 
-    s3_model_load, 
+    s3_model_save,
+    s3_model_load,
     boolean,
     check_error,
     MODELS,
@@ -45,7 +45,7 @@ async def model_steps(
     if model_type in OPTIMIZERS.values():
         if "best_estimator_" in model.__dict__:
             return True, [i for i in model.best_estimator_.named_steps.keys()]
-        else: 
+        else:
             return False, "훈련되지 않은 옵티마이저 입니다."
     else:
         return True, [i for i in model.named_steps.keys()]
@@ -102,7 +102,7 @@ async def model_transform(
     ```
     """
     target = None if target == "" else target
-    
+
     X = pd.read_json(await item.json())
 
     # # 테스트용
@@ -119,7 +119,7 @@ async def model_transform(
     if model_type in OPTIMIZERS.values():
         if "best_estimator_" in model.__dict__:
             steps = model.best_estimator_.named_steps
-        else: 
+        else:
             return False, "훈련되지 않은 옵티마이저 입니다."
     else:
         steps = model.named_steps
@@ -150,7 +150,7 @@ async def model_transform(
 async def model_fit_transform(
     item   : Request,
     name   : str,
-    key    : str, 
+    key    : str,
 ) -> tuple:
     """
     ```
@@ -208,7 +208,7 @@ async def model_fit_transform(
 async def model_fit(
     item   : Request,
     name   : str,
-    key    : str, 
+    key    : str,
 ) -> tuple:
     """
     ```
@@ -331,12 +331,12 @@ async def model_predict(
                 "y_pred_proba": pd.DataFrame(pipe.predict_proba(X)).to_json(orient="records")
             }
         except ValueError:
-            return False, "훈련되지 않은 함수입니다. fit 함수를 실행 후 다시 predict 함수를 해주세요."  
+            return False, "훈련되지 않은 함수입니다. fit 함수를 실행 후 다시 predict 함수를 해주세요."
         except:
             output[name] = {
                 "y_pred": pd.DataFrame(pipe.predict(X)).to_json(orient="records")
             }
-    
+
     return True, output
 
 
@@ -369,7 +369,7 @@ async def model_fit_predict(
     pipe.fit(X_train, y_train)
 
     # save가 true면 학습된 모델 객체 s3에 저장
-    if save: 
+    if save:
         try   : s3_model_save(key, pipe)
         except: return False, "훈련에는 성공하였으나 모델 저장에 실패하였습니다.(알 수 없는 에러)"
 
@@ -389,7 +389,7 @@ async def model_fit_predict(
             output[name] = {
                 "y_pred": pd.DataFrame(pipe.predict(X)).to_json(orient="records")
             }
-    
+
     return True, output
 
 
@@ -401,8 +401,8 @@ async def model_score(
     """
     ```python
     item = {
-        "y_ture":..., 
-        "y_pred":..., 
+        "y_ture":...,
+        "y_pred":...,
         "y_pred_proba":(optional)...
     }
     metric에 아래 metric중 하나를 입력
@@ -422,26 +422,24 @@ async def model_score(
     """
     # 데이터 로드
     # {"y_ture":..., "y_pred":..., *, "y_pred_proba":...}
-    
+
     item = await item.json()
 
     output = {}
     for name, i_y in item.items():
-        if i_y is None:
+        if i_y["y_true"] is None:
             continue
-        
-        print(name)
-        print(i_y)
+
         y_true = pd.read_json(i_y["y_true"])
 
         try:
-            y_pred = pd.read_json(i_y["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(i_y["y_pred"]) 
+            y_pred = pd.read_json(i_y["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(i_y["y_pred"])
             output[name] = f"{METRICS[metric](y_true, y_pred)}"
-        
+
         except:
             # roc_auc 는 y_pred가 predict proba가 들어가야함
             return False, f'"{metric}"은 회귀 모델에서 사용할 수 없습니다.'
-        
+
     # 점수 값 리턴
     return True, output
 
@@ -478,7 +476,7 @@ async def model_predict_score(
                 "y_pred": pd.DataFrame(pipe.predict(X)).to_json(orient="records")
             }
 
-    
+
     # score
     output = {}
     for name, i_y in y_preds.items():
@@ -486,12 +484,12 @@ async def model_predict_score(
             continue
         y_true = pd.read_json(i_y["y_true"])
         try:
-            y_pred = pd.read_json(i_y["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(i_y["y_pred"]) 
+            y_pred = pd.read_json(i_y["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(i_y["y_pred"])
             output[name] = f"{METRICS[metric](y_true, y_pred)}"
         except:
             return False, f'"{metric}"은 회귀 모델에서 사용할 수 없습니다.'
             # roc_auc 는 y_pred가 predict proba가 들어가야함
-    
+
     # 점수 값 리턴
     return True, output
 
@@ -526,8 +524,8 @@ async def model_fit_predict_score(
     # 모델 학습
     pipe.fit(X_train, y_train)
 
-    # 모델 세이브 if save is True 
-    if save: 
+    # 모델 세이브 if save is True
+    if save:
         try   : s3_model_save(key, pipe)
         except: return False, "훈련에는 성공하였으나 모델 저장에 실패하였습니다.(알 수 없는 에러)"
 
@@ -554,7 +552,7 @@ async def model_fit_predict_score(
             continue
         y_true = pd.read_json(i_y["y_true"])
         try:
-            y_pred = pd.read_json(i_y["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(i_y["y_pred"]) 
+            y_pred = pd.read_json(i_y["y_pred_proba"]).iloc[:,1] if metric in ["roc_auc"] else pd.read_json(i_y["y_pred"])
             output[name] = f"{METRICS[metric](y_true, y_pred)}"
         except:
             return False, f'"{metric}"은 회귀 모델에서 사용할 수 없습니다.'
