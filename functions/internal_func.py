@@ -163,11 +163,11 @@ import datetime, inspect, traceback, jwt
 SECRET_KEY=os.getenv("SECRET_KEY")
 
 def check_error(func):
-    async def wrapper(*args, user_id: Optional[str] = Header(None), access_token: Optional[str] = Cookie(None), **kwargs):
+    async def wrapper(*args, user_id: Optional[str] = Header(None), token: Optional[str] = Header(None), **kwargs):
         try:
             # 토큰을 검증하여 유효한 토큰인지 확인
             # JWT 토큰 인증되지 않으면 기능 작동 X (정상적인 사용자가 아닌 것으로 간주)
-            at = access_token
+            at = token
             jwt.decode(at, SECRET_KEY, algorithms="HS256")
         except Exception as e:
             return {"result":False, "token_state":False, "message":str(e)}
