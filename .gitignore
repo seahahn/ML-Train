@@ -1,3 +1,6 @@
 __pycache__
 test_pipe.pickle
-.env
+.env*
+
+/.venv
+.DS_Store
