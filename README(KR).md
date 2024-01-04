@@ -61,7 +61,15 @@
   <summary>펼쳐보기</summary>
 
 ```
-// 필요한 패키지 설치
+# 새 가상환경 만들기
+# 1. 사용해야 할 python version이 있는 디렉토리로 이동
+# 2. 새 가상환경 생성을 위한 명령어 실행
+python -m venv /path/to/new/virtual/environment
+
+# 3. 가상환경 활성화하기
+source /path/to/new/virtual/environment/bin/activate
+
+# 4. 필요한 패키지 설치
 pip install -r requirements.txt
 ```
 
