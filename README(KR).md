@@ -16,13 +16,13 @@
 ## 2️⃣ 배포 플랫폼 및 서버 주소
 
 - 플랫폼 : Heroku
-- 주소 : https://aiplay-mltrain.herokuapp.com/
+- 주소 : [(https://ai-play-ml-train-39582523ef76.herokuapp.com/](https://ai-play-ml-train-39582523ef76.herokuapp.com/)
 
 <br/>
 
 ## :three: API 명세
 
-- DOCS : https://aiplay-mltrain.herokuapp.com/docs
+- DOCS : [https://ai-play-ml-train-39582523ef76.herokuapp.com/docs](https://ai-play-ml-train-39582523ef76.herokuapp.com/docs)
 
 <details>
   <summary>펼쳐보기</summary>

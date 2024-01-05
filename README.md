@@ -16,13 +16,13 @@ API server for model training, one of the machine learning-related functions.
 ## 2️⃣ Deployment Platform and Server Address
 
 - Platform: Heroku
-- Address: [https://aiplay-mltrain.herokuapp.com/](https://aiplay-mltrain.herokuapp.com/)
+- Address: [https://ai-play-ml-train-39582523ef76.herokuapp.com/](https://ai-play-ml-train-39582523ef76.herokuapp.com/)
 
 <br/>
 
 ## :three: API Specification
 
-- DOCS: [https://aiplay-mltrain.herokuapp.com/docs](https://aiplay-mltrain.herokuapp.com/docs)
+- DOCS: [https://ai-play-ml-train-39582523ef76.herokuapp.com/docs](https://ai-play-ml-train-39582523ef76.herokuapp.com/docs)
 
 <details>
   <summary>Expand</summary>
